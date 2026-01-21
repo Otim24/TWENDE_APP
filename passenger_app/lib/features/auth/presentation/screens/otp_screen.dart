@@ -60,6 +60,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     );
 
     return Scaffold(
+      extendBodyBehindAppBar: true, // Allow gradient to go behind AppBar
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -68,59 +69,75 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
           onPressed: () => context.pop(),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            const Icon(Icons.mail_lock_rounded, size: 60, color: Color(0xFFFFD740)),
-            const SizedBox(height: 24),
-            Text(
-              "Verify Number",
-              style: GoogleFonts.poppins(
-                fontSize: 20, 
-                fontWeight: FontWeight.bold, 
-                color: Colors.white
+      body: Stack(
+        children: [
+          // Background Gradient
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.black, Colors.black],
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              "Enter code sent via SMS to ${widget.phone}",
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white60),
-            ),
-            
-            const SizedBox(height: 48),
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                children: [
+                  const Icon(Icons.mail_lock_rounded, size: 60, color: Color(0xFFFFD740)),
+                  const SizedBox(height: 24),
+                  Text(
+                    "Verify Number",
+                    style: GoogleFonts.poppins(
+                      fontSize: 20, 
+                      fontWeight: FontWeight.bold, 
+                      color: Colors.white
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Enter code sent via SMS to ${widget.phone}",
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white60),
+                  ),
+                  
+                  const SizedBox(height: 48),
 
-            Pinput(
-              controller: _pinController,
-              focusNode: _focusNode,
-              length: 6,
-              defaultPinTheme: defaultPinTheme,
-              focusedPinTheme: defaultPinTheme.copyWith(
-                decoration: defaultPinTheme.decoration!.copyWith(
-                  border: Border.all(color: const Color(0xFF7C4DFF)),
-                ),
+                  Pinput(
+                    controller: _pinController,
+                    focusNode: _focusNode,
+                    length: 6,
+                    defaultPinTheme: defaultPinTheme,
+                    focusedPinTheme: defaultPinTheme.copyWith(
+                      decoration: defaultPinTheme.decoration!.copyWith(
+                        border: Border.all(color: const Color(0xFF7C4DFF)),
+                      ),
+                    ),
+                    onCompleted: _verifyOtp,
+                    androidSmsAutofillMethod: AndroidSmsAutofillMethod.smsUserConsentApi,
+                  ),
+
+                  const SizedBox(height: 40),
+                  
+                  if (_isLoading)
+                    const CircularProgressIndicator(color: Color(0xFF7C4DFF)),
+                    
+                  const Spacer(),
+                  
+                  TextButton(
+                    onPressed: () {
+                      // TODO: Resend OTP
+                    },
+                    child: const Text("Resend Code in 30s", style: TextStyle(color: Colors.white54)),
+                  ),
+                  const SizedBox(height: 20),
+                ],
               ),
-              onCompleted: _verifyOtp,
-              androidSmsAutofillMethod: AndroidSmsAutofillMethod.smsUserConsentApi,
             ),
-
-            const SizedBox(height: 40),
-            
-            if (_isLoading)
-              const CircularProgressIndicator(color: Color(0xFF7C4DFF)),
-              
-            const Spacer(),
-            
-            TextButton(
-              onPressed: () {
-                // TODO: Resend OTP
-              },
-              child: const Text("Resend Code in 30s", style: TextStyle(color: Colors.white54)),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

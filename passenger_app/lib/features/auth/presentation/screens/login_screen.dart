@@ -51,7 +51,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Color(0xFF1E1E1E), Color(0xFF121212)],
+                colors: [Colors.black, Colors.black],
               ),
             ),
           ),
@@ -61,7 +61,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 children: [
-                  const SizedBox(height: 60),
+                  const Spacer(flex: 2),
+                  
                   // Icon
                   const Icon(Icons.phone_iphone_rounded, size: 64, color: Color(0xFFFFD740))
                       .animate()
@@ -87,7 +88,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     icon: Icons.edit,
                   ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2, end: 0),
 
-                  const Spacer(),
+                  const Spacer(flex: 3),
 
                   // Continue Button
                   SizedBox(

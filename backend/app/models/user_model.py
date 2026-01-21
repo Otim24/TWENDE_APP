@@ -11,7 +11,7 @@ class User(TimestampMixin, models.Model):
     id = fields.IntField(pk=True)
     phone = fields.CharField(max_length=20, unique=True)
     password_hash = fields.CharField(max_length=255)
-    full_name = fields.CharField(max_length=100)
+    full_name = fields.CharField(max_length=100, null=True)
     role = fields.CharEnumField(UserRole, default=UserRole.PASSENGER)
 
     # Reverse relations
