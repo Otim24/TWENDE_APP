@@ -1,20 +1,26 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 
 
 class GlassBookingCard extends StatefulWidget {
   final ValueChanged<bool>? onFocusChange; // Callback for greeting change
+  final TextEditingController fromController;
+  final TextEditingController toController;
 
-  const GlassBookingCard({super.key, this.onFocusChange});
+  const GlassBookingCard({
+    super.key,
+    this.onFocusChange,
+    required this.fromController,
+    required this.toController,
+  });
 
   @override
   State<GlassBookingCard> createState() => _GlassBookingCardState();
 }
 
 class _GlassBookingCardState extends State<GlassBookingCard> {
-  final TextEditingController _fromController = TextEditingController();
-  final TextEditingController _toController = TextEditingController();
   final FocusNode _fromFocus = FocusNode();
   final FocusNode _toFocus = FocusNode();
   
@@ -39,10 +45,10 @@ class _GlassBookingCardState extends State<GlassBookingCard> {
 
   // Method to swap locations
   void _swapLocations() {
-    final temp = _fromController.text;
+    final temp = widget.fromController.text;
     setState(() {
-      _fromController.text = _toController.text;
-      _toController.text = temp;
+      widget.fromController.text = widget.toController.text;
+      widget.toController.text = temp;
     });
   }
 
@@ -74,7 +80,7 @@ class _GlassBookingCardState extends State<GlassBookingCard> {
               _buildLocationInput(
                 icon: Icons.my_location_rounded,
                 hint: "From",
-                controller: _fromController,
+                controller: widget.fromController,
                 focusNode: _fromFocus,
                 iconColor: const Color(0xFFAB47BC), // Lighter Purple for contrast
               ),
@@ -95,7 +101,7 @@ class _GlassBookingCardState extends State<GlassBookingCard> {
               _buildLocationInput(
                 icon: Icons.location_on_rounded,
                 hint: "To",
-                controller: _toController,
+                controller: widget.toController,
                 focusNode: _toFocus,
                 iconColor: Colors.redAccent, // Red Pin
               ),
@@ -143,7 +149,7 @@ class _GlassBookingCardState extends State<GlassBookingCard> {
                       children: [
                         Text(
                           weekdayName,
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.outfit(
                             color: isSelected ? Colors.white : Colors.white54,
                             fontSize: 10, // Small text
                             fontWeight: FontWeight.w500,
@@ -152,7 +158,7 @@ class _GlassBookingCardState extends State<GlassBookingCard> {
                         const SizedBox(height: 4),
                         Text(
                           "${date.day}",
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.outfit(
                             color: Colors.white,
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
@@ -171,11 +177,17 @@ class _GlassBookingCardState extends State<GlassBookingCard> {
           // Search Button (Purple to Pop)
           Center(
             child: GestureDetector(
-              onTap: () {
-                 // TODO: Search Logic
-                _fromFocus.unfocus();
-                _toFocus.unfocus();
-              },
+                onTap: () {
+                 _fromFocus.unfocus();
+                 _toFocus.unfocus();
+                 context.push(
+                   '/search_results',
+                   extra: {
+                     'from': widget.fromController.text.isEmpty ? "Kampala" : widget.fromController.text,
+                     'to': widget.toController.text.isEmpty ? "Gulu" : widget.toController.text,
+                   },
+                 );
+                },
               child: Container(
                 width: 200, // Shortened width
                 height: 50,
@@ -201,7 +213,7 @@ class _GlassBookingCardState extends State<GlassBookingCard> {
                 child: Center(
                   child: Text(
                     "Search Buses",
-                    style: GoogleFonts.poppins(
+                    style: GoogleFonts.outfit(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -234,7 +246,7 @@ class _GlassBookingCardState extends State<GlassBookingCard> {
             style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500),
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: GoogleFonts.poppins(color: Colors.white38),
+              hintStyle: GoogleFonts.outfit(color: Colors.white38),
               filled: false, // EXPLICITLY FALSE to remove any default background
               border: InputBorder.none,
               focusedBorder: InputBorder.none,

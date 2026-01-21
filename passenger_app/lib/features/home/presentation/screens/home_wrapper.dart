@@ -72,7 +72,7 @@ class _HomeWrapperState extends State<HomeWrapper> {
               ),
               child: Text(
                 label,
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.outfit(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                   color: const Color(0xFF4A148C),
@@ -82,7 +82,7 @@ class _HomeWrapperState extends State<HomeWrapper> {
           else
             Text(
               label,
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.outfit(
                 fontSize: 12,
                 color: Colors.white38,
               ),

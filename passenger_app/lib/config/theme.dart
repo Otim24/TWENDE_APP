@@ -12,7 +12,7 @@ class AppTheme {
       secondary: Color(0xFF7C4DFF),
       surface: Color(0xFF2C2C2C),
     ),
-    textTheme: GoogleFonts.poppinsTextTheme(
+    textTheme: GoogleFonts.outfitTextTheme(
       ThemeData.dark().textTheme,
     ).apply(
       bodyColor: const Color(0xFFB0BEC5),
