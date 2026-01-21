@@ -32,7 +32,7 @@ class ActionButton extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
                // Make icon larger
-              Icon(icon, size: 48, color: const Color(0xFFFFD740)), // Yellow Accent
+              Icon(icon, size: 48, color: const Color(0xFF4A148C)), // Deep Rich Purple
               const SizedBox(height: 16),
               Text(
                 label,

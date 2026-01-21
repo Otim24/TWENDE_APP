@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:twende_passenger_app/features/auth/data/auth_repository.dart';
-import 'package:twende_passenger_app/features/auth/presentation/widgets/glass_pill_input.dart';
+import 'package:twende_passenger_app/core/widgets/glass_pill_input.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});

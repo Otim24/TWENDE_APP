@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:twende_passenger_app/config/theme.dart';
 import 'package:twende_passenger_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:twende_passenger_app/features/auth/presentation/screens/otp_screen.dart';
-import 'package:twende_passenger_app/features/home/presentation/screens/home_screen.dart';
+import 'package:twende_passenger_app/features/home/presentation/screens/home_wrapper.dart';
+
+import 'package:twende_passenger_app/features/wallet/presentation/screens/deposit_screen.dart';
 
 void main() {
   runApp(
@@ -36,7 +38,11 @@ final _router = GoRouter(
     ),
     GoRoute(
       path: '/home',
-      builder: (context, state) => const HomeScreen(),
+      builder: (context, state) => const HomeWrapper(),
+    ),
+    GoRoute(
+      path: '/wallet/deposit',
+      builder: (context, state) => const DepositScreen(),
     ),
     // Add more routes here
   ],

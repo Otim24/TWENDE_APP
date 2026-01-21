@@ -6,12 +6,16 @@ class GlassPillInput extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;
   final IconData? icon;
+  final TextInputType keyboardType;
+  final bool showCountryCode;
 
   const GlassPillInput({
     super.key,
     required this.controller,
     this.hintText = "Phone Number",
     this.icon,
+    this.keyboardType = TextInputType.phone,
+    this.showCountryCode = true,
   });
 
   @override
@@ -27,36 +31,38 @@ class GlassPillInput extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       child: Row(
         children: [
-          // Flag Placeholder (Could be an image asset or emoji)
-          const Text(
-            "🇺🇬",
-            style: TextStyle(fontSize: 24),
-          ),
-          const SizedBox(width: 8),
-          
-          // Prefix
-          Text(
-            "+256",
-            style: GoogleFonts.poppins(
-              color: Colors.white70,
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
+          if (showCountryCode) ...[
+            // Flag Placeholder
+            const Text(
+              "🇺🇬",
+              style: TextStyle(fontSize: 24),
             ),
-          ),
-          
-          // Vertical Divider
-          Container(
-            height: 24,
-            width: 1,
-            margin: const EdgeInsets.symmetric(horizontal: 12),
-            color: Colors.white24,
-          ),
+            const SizedBox(width: 8),
+            
+            // Prefix
+            Text(
+              "+256",
+              style: GoogleFonts.poppins(
+                color: Colors.white70,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            
+            // Vertical Divider
+            Container(
+              height: 24,
+              width: 1,
+              margin: const EdgeInsets.symmetric(horizontal: 12),
+              color: Colors.white24,
+            ),
+          ],
           
           // Input Field
           Expanded(
             child: TextField(
               controller: controller,
-              keyboardType: TextInputType.phone,
+              keyboardType: keyboardType,
               style: GoogleFonts.poppins(
                 color: Colors.white,
                 fontSize: 16,
