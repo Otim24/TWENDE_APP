@@ -1,55 +1,72 @@
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from tortoise.transactions import in_atomic_block
-
-from app.schemas.auth_schema import UserCreate, Token
-from app.models.user_model import User
+from fastapi import APIRouter, HTTPException, Depends, status
+from app.schemas.auth_schema import Token
+from app.core.security import create_access_token
+from app.models.user_model import User, UserRole
 from app.models.wallet_model import Wallet
-from app.core.security import verify_password, get_password_hash, create_access_token
+from app.core.config import settings
+from app.services.notification import notification_service
+import redis.asyncio as redis
+import random
+from pydantic import BaseModel
 
 router = APIRouter()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
-@router.post("/signup", response_model=Token)
-async def signup(user_in: UserCreate):
-    # Check if user exists
-    if await User.get_or_none(phone=user_in.phone):
+# Simple connection pool for Redis
+redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+
+class OTPRequest(BaseModel):
+    phone: str
+
+class OTPVerify(BaseModel):
+    phone: str
+    code: str
+
+@router.post("/otp/request")
+async def request_otp(payload: OTPRequest):
+    # 1. Generate 6-digit code
+    code = str(random.randint(100000, 999999))
+    
+    # 2. Store in Redis (TTL: 300s = 5 mins)
+    await redis_client.setex(f"otp:{payload.phone}", 300, code)
+    
+    # 3. Send SMS
+    await notification_service.send_sms(payload.phone, code)
+    
+    return {"message": "OTP sent successfully"}
+
+@router.post("/otp/verify", response_model=Token)
+async def verify_otp(payload: OTPVerify):
+    # 1. Verify Code
+    stored_code = await redis_client.get(f"otp:{payload.phone}")
+    
+    if not stored_code or stored_code != payload.code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Phone number already registered"
-        )
-
-    password_hash = get_password_hash(user_in.password)
-
-    # Transaction: Create User + Wallet
-    async with in_atomic_block():
-        user = await User.create(
-            phone=user_in.phone,
-            password_hash=password_hash,
-            full_name=user_in.full_name,
-            role=user_in.role
-        )
-        # Create Wallet for user
-        await Wallet.create(user=user)
-
-    # Generate Token
-    access_token = create_access_token(
-        data={"sub": str(user.id), "role": user.role.value}
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
-
-@router.post("/login", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = await User.get_or_none(phone=form_data.username)
-    if not user or not verify_password(form_data.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect phone or password",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail="Invalid or expired OTP"
         )
     
+    # 2. Find or Create User
+    user = await User.get_or_none(phone=payload.phone)
+    is_new_user = False
+    
+    if not user:
+        # Create new passenger
+        is_new_user = True
+        user = await User.create(
+            phone=payload.phone,
+            password_hash="", # No password needed
+            role=UserRole.PASSENGER
+        )
+        # Create Wallet
+        await Wallet.create(user=user)
+
+    # 3. Create Token
     access_token = create_access_token(
         data={"sub": str(user.id), "role": user.role.value}
     )
+    
+    # 4. Clean up OTP
+    await redis_client.delete(f"otp:{payload.phone}")
+    
     return {"access_token": access_token, "token_type": "bearer"}
