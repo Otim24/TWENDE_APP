@@ -32,7 +32,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Login Successful!"), backgroundColor: Colors.green),
         );
-        // context.go('/home'); // TODO: Define Home Route
+        context.go('/home');
       }
     } catch (e) {
       if (mounted) {
