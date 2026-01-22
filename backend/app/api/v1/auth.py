@@ -48,18 +48,21 @@ async def verify_otp(payload: OTPVerify):
     
     # 2. Find or Create User
     user = await User.get_or_none(phone=payload.phone)
-    is_new_user = False
     
     if not user:
-        # Create new passenger
-        is_new_user = True
-        user = await User.create(
-            phone=payload.phone,
-            password_hash="", # No password needed
-            role=UserRole.PASSENGER
-        )
-        # Create Wallet
-        await Wallet.create(user=user)
+        from tortoise.transactions import in_transaction
+        
+        async with in_transaction():
+            # Create new passenger
+            user = await User.create(
+                phone=payload.phone,
+                password_hash="", # No password needed
+                role=UserRole.PASSENGER,
+                # Default name, can be updated later via /users/me
+                full_name="Passenger" 
+            )
+            # Create Wallet
+            await Wallet.create(user=user)
 
     # 3. Create Token
     access_token = create_access_token(

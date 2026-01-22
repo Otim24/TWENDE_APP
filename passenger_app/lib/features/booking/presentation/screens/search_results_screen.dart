@@ -105,7 +105,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                 child: Text(
                   isFrom ? "Select Departure" : "Select Destination",
-                  style: GoogleFonts.outfit(
+                  style: GoogleFonts.poppins(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -136,7 +136,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                       ),
                       title: Text(
                         district,
-                        style: GoogleFonts.outfit(
+                        style: GoogleFonts.poppins(
                           color: Colors.white,
                           fontSize: 16,
                         ),
@@ -168,16 +168,16 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Filter Options", style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+              Text("Filter Options", style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
               const SizedBox(height: 16),
               ListTile(
                 leading: const Icon(Icons.sort_rounded, color: Colors.white),
-                title: Text("Sort by Price (Low to High)", style: GoogleFonts.outfit(color: Colors.white)),
+                title: Text("Sort by Price (Low to High)", style: GoogleFonts.poppins(color: Colors.white)),
                 onTap: () => Navigator.pop(context),
               ),
               ListTile(
                 leading: const Icon(Icons.access_time_rounded, color: Colors.white),
-                title: Text("Sort by Departure Time", style: GoogleFonts.outfit(color: Colors.white)),
+                title: Text("Sort by Departure Time", style: GoogleFonts.poppins(color: Colors.white)),
                 onTap: () => Navigator.pop(context),
               ),
             ],
@@ -221,7 +221,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                       const SizedBox(width: 8),
                       Text(
                         "Results",
-                        style: GoogleFonts.outfit(
+                        style: GoogleFonts.poppins(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -259,7 +259,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                             Expanded(
                               child: Text(
                                 _fromLocation,
-                                style: GoogleFonts.outfit(
+                                style: GoogleFonts.poppins(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white, // White Text
@@ -294,7 +294,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                             Expanded(
                               child: Text(
                                 _toLocation,
-                                style: GoogleFonts.outfit(
+                                style: GoogleFonts.poppins(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white, // White Text
@@ -328,7 +328,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     alignment: Alignment.centerLeft,
                     child: Text(
                       "Recommended Buses",
-                      style: GoogleFonts.outfit(
+                      style: GoogleFonts.poppins(
                         fontSize: 16,
                         color: Colors.white70,
                         fontWeight: FontWeight.w500,
@@ -373,7 +373,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               const SizedBox(width: 6),
               Text(
                 label,
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.poppins(
                   fontSize: 13,
                   color: Colors.white, // White Text
                   fontWeight: FontWeight.w500,
@@ -416,7 +416,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                   children: [
                     Text(
                       bus['company'],
-                      style: GoogleFonts.outfit(
+                      style: GoogleFonts.poppins(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -424,7 +424,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     ),
                     Text(
                       bus['route'],
-                      style: GoogleFonts.outfit(
+                      style: GoogleFonts.poppins(
                         color: Colors.white70,
                         fontSize: 13,
                       ),
@@ -437,11 +437,11 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 children: [
                   Text(
                     "Arriving",
-                    style: GoogleFonts.outfit(color: Colors.white54, fontSize: 10),
+                    style: GoogleFonts.poppins(color: Colors.white54, fontSize: 10),
                   ),
                   Text(
                     bus['eta'], // e.g., "in 15 min"
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.poppins(
                       color: Colors.orangeAccent,
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
@@ -463,14 +463,14 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               const SizedBox(width: 4),
               Text(
                 bus['distance'],
-                style: GoogleFonts.outfit(color: Colors.white54, fontSize: 13),
+                style: GoogleFonts.poppins(color: Colors.white54, fontSize: 13),
               ),
               const Spacer(),
               const Icon(Icons.event_seat_outlined, size: 16, color: Colors.white54),
               const SizedBox(width: 4),
               Text(
                 "${bus['seats']} seats left",
-                style: GoogleFonts.outfit(color: Colors.white54, fontSize: 13),
+                style: GoogleFonts.poppins(color: Colors.white54, fontSize: 13),
               ),
             ],
           ),
@@ -486,11 +486,11 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 children: [
                   Text(
                     "Price",
-                    style: GoogleFonts.outfit(color: Colors.white54, fontSize: 10),
+                    style: GoogleFonts.poppins(color: Colors.white54, fontSize: 10),
                   ),
                   Text(
                     bus['price'],
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.poppins(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -511,7 +511,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 ),
                 child: Text(
                   "Select Bus",
-                  style: GoogleFonts.outfit(
+                  style: GoogleFonts.poppins(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                   ),

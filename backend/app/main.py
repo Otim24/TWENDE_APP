@@ -12,8 +12,12 @@ async def health_check():
 # Initialize DB
 init_db(app)
 
-from app.api.v1 import auth
+from app.api.v1 import auth, bookings, wallet, users
+
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(bookings.router, prefix="/api/v1/bookings", tags=["bookings"])
+app.include_router(wallet.router, prefix="/api/v1/wallet", tags=["wallet"])
+app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
 
 
 if __name__ == "__main__":
