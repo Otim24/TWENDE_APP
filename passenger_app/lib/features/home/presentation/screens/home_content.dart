@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:twende_passenger_app/features/home/presentation/widgets/action_button.dart';
 import 'package:twende_passenger_app/features/home/presentation/widgets/glass_booking_card.dart';
+import 'package:twende_passenger_app/features/home/presentation/widgets/promo_carousel.dart';
 import 'package:go_router/go_router.dart';
 import 'package:twende_passenger_app/features/home/presentation/widgets/glass_wallet_card.dart';
 
@@ -46,10 +47,10 @@ class _HomeContentState extends State<HomeContent> {
           ),
         ),
 
-        // Main Content
+        // Main Content (Scrollable)
         SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0), // Reduced from 16
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -90,7 +91,7 @@ class _HomeContentState extends State<HomeContent> {
                   ),
                 ),
                 
-                const SizedBox(height: 16),
+                const SizedBox(height: 10), // Reduced from 16
 
                 // Wallet Access Button (Glass Pill)
                 Center(
@@ -124,7 +125,7 @@ class _HomeContentState extends State<HomeContent> {
                   ),
                 ),
                 
-                const SizedBox(height: 24),
+                const SizedBox(height: 16), // Reduced from 24
 
                 // Booking Card (Hero)
                 GlassBookingCard(
@@ -133,158 +134,89 @@ class _HomeContentState extends State<HomeContent> {
                   toController: _toController,
                 ),
 
-                const SizedBox(height: 16),
-                
-                 // Pay for Ticket Button (Centered, Glassmorphic)
-                Center(
-                  child: GestureDetector(
-                    onTap: () {
-                      if (_fromController.text.isEmpty || _toController.text.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              "Please enter 'From' and 'To' locations first.",
-                              style: GoogleFonts.outfit(color: Colors.white),
-                            ),
-                            backgroundColor: Colors.redAccent,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                        return;
-                      }
-                      
-                      context.push(
-                        '/search_results',
-                        extra: {
-                          'from': _fromController.text,
-                          'to': _toController.text,
-                        },
-                      );
-                    },
-                    child: Container(
-                      width: 200,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFF4A148C).withOpacity(0.9),
-                            const Color(0xFF4A148C).withOpacity(0.7),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: Colors.white.withOpacity(0.1)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF4A148C).withOpacity(0.3),
-                            blurRadius: 16,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Text(
-                          "Pay for Ticket",
-                          style: GoogleFonts.outfit(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 32),
-
-                // Recent Search Heading
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "Recent Search",
-                      style: GoogleFonts.outfit(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    Text(
-                      "See all",
-                      style: GoogleFonts.outfit(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xFFFF8C00), // Orange accent like ref image
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Recent Search List
-                Column(
-                  children: [
-                    _buildRecentSearchItem("Kampala", "Jinja"),
-                    _buildRecentSearchItem("Entebbe", "Gulu"),
-                    _buildRecentSearchItem("Mbarara", "Kabale"),
-                  ],
-                ),
-                
-                const SizedBox(height: 24), // Bottom Padding
+                const SizedBox(height: 200), // Increased Spacing to clear Button + Carousel
               ],
             ),
           ),
-        ), // Closes SafeArea
+        ),
+
+        // Pay for Ticket Button (Shifted Up)
+        Positioned(
+          bottom: 120, // Shifted up to make room for Carousel (100px + 20px padding)
+          left: 0,
+          right: 0,
+          child: Center(
+            child: GestureDetector(
+              onTap: () {
+                if (_fromController.text.isEmpty || _toController.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        "Please enter 'From' and 'To' locations first.",
+                        style: GoogleFonts.outfit(color: Colors.white),
+                      ),
+                      backgroundColor: Colors.redAccent,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  return;
+                }
+                
+                context.push(
+                  '/search_results',
+                  extra: {
+                    'from': _fromController.text,
+                    'to': _toController.text,
+                  },
+                );
+              },
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.6, 
+                height: 50, 
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF4A148C),
+                      const Color(0xFF7B1FA2),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF4A148C).withOpacity(0.4),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Text(
+                    "Pay for Ticket",
+                    style: GoogleFonts.outfit(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // Ads / Promo Carousel (Fixed at Absolute Bottom)
+        Positioned(
+          bottom: 16, // Near bottom (above Nav Bar visual area)
+          left: 0,
+          right: 0,
+          child: const Center(
+            child: PromoCarousel(),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildRecentSearchItem(String from, String to) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.1), // Light grey circle
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.history, color: Colors.grey, size: 20),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "From - To",
-                      style: GoogleFonts.outfit(
-                        color: Colors.grey,
-                        fontSize: 12,
-                      ),
-                    ),
-                    Text(
-                      "$from - $to",
-                      style: GoogleFonts.outfit(
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Divider(color: Colors.grey.withOpacity(0.1)),
-        ],
-      ),
-    );
-  }
 }

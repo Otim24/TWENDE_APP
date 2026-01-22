@@ -23,6 +23,7 @@ class GlassBookingCard extends StatefulWidget {
 class _GlassBookingCardState extends State<GlassBookingCard> {
   final FocusNode _fromFocus = FocusNode();
   final FocusNode _toFocus = FocusNode();
+  int _selectedDateIndex = 0; // State for selected date
   
   @override
   void initState() {
@@ -53,14 +54,13 @@ class _GlassBookingCardState extends State<GlassBookingCard> {
   }
 
   @override
-  @override
-  @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E), // Charcoal Black Card
+        color: Colors.black, // Pure Black to match Wallet
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.3),
@@ -114,7 +114,7 @@ class _GlassBookingCardState extends State<GlassBookingCard> {
           // Departure Title
           Text(
             "Departure",
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.outfit( // Switched to Outfit
               color: Colors.white70, // White Text
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -127,7 +127,7 @@ class _GlassBookingCardState extends State<GlassBookingCard> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(6, (index) {
               final date = DateTime.now().add(Duration(days: index));
-              final isSelected = index == 0; // Default to today
+              final isSelected = index == _selectedDateIndex; // Interactive selection
               
               final weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
               final weekdayName = weekdays[date.weekday - 1];
@@ -135,15 +135,31 @@ class _GlassBookingCardState extends State<GlassBookingCard> {
               return Expanded(
                 child: GestureDetector(
                   onTap: () {
-                    // TODO: Handle Selection
+                    setState(() {
+                      _selectedDateIndex = index;
+                    });
                   },
-                  child: Container(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOut, // Changed from easeOutBack to prevent negative shadow blur
+                    transform: isSelected 
+                      ? Matrix4.translationValues(0, -6, 0) // Lift up by 6px
+                      : Matrix4.identity(),
                     margin: const EdgeInsets.symmetric(horizontal: 2), // Tiny gap
                     padding: const EdgeInsets.symmetric(vertical: 12), // Height only
                     decoration: BoxDecoration(
                       color: isSelected ? const Color(0xFF4A148C) : Colors.transparent, 
                       borderRadius: BorderRadius.circular(12),
                       border: isSelected ? null : Border.all(color: Colors.white12),
+                      boxShadow: isSelected 
+                        ? [
+                            BoxShadow(
+                              color: const Color(0xFF4A148C).withOpacity(0.5),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
+                            )
+                          ] 
+                        : [],
                     ),
                     child: Column(
                       children: [
@@ -180,11 +196,15 @@ class _GlassBookingCardState extends State<GlassBookingCard> {
                 onTap: () {
                  _fromFocus.unfocus();
                  _toFocus.unfocus();
+                 
+                 final selectedDate = DateTime.now().add(Duration(days: _selectedDateIndex));
+                 
                  context.push(
                    '/search_results',
                    extra: {
                      'from': widget.fromController.text.isEmpty ? "Kampala" : widget.fromController.text,
                      'to': widget.toController.text.isEmpty ? "Gulu" : widget.toController.text,
+                     'date': selectedDate.toString(), // Passing the date
                    },
                  );
                 },
@@ -243,7 +263,7 @@ class _GlassBookingCardState extends State<GlassBookingCard> {
           child: TextField(
             controller: controller,
             focusNode: focusNode,
-            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500),
+            style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w500), // Switched to Outfit
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: GoogleFonts.outfit(color: Colors.white38),

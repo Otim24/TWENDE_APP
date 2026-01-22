@@ -31,7 +31,15 @@ class _HomeWrapperState extends State<HomeWrapper> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black, // Charcoal Black / Pure Black
-      body: _screens[_selectedIndex], // Switch body based on index
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        switchInCurve: Curves.easeInOut,
+        switchOutCurve: Curves.easeInOut,
+        child: KeyedSubtree(
+          key: ValueKey<int>(_selectedIndex),
+          child: _screens[_selectedIndex],
+        ),
+      ), // Switch body based on index
       bottomNavigationBar: Container(
         color: Colors.black,
         padding: const EdgeInsets.symmetric(vertical: 12),
