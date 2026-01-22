@@ -58,8 +58,8 @@ class _PromoCarouselState extends State<PromoCarousel> {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 80, // Reduced height for banner look
-      width: 320, // Rectangular width
+      height: 115, // Reduced height (Sleeker)
+      width: 340, 
       child: PageView.builder(
         controller: _pageController,
         onPageChanged: (index) {
@@ -72,8 +72,8 @@ class _PromoCarouselState extends State<PromoCarousel> {
           final ad = _ads[index];
           return Center(
             child: Container(
-              width: 300, // Inner Rectangle Width
-              height: 70, // Inner Rectangle Height
+              width: 320, 
+              height: 95, // Inner Height
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.9), // Glassy Black
                 borderRadius: BorderRadius.circular(16),

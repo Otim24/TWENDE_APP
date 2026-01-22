@@ -27,12 +27,9 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
         phone: widget.phone, 
         code: pin
       );
-      // Success - Navigate to Home (or wherever)
+      // Success - Navigate to Splash Screen
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Login Successful!"), backgroundColor: Colors.green),
-        );
-        context.go('/home');
+        context.go('/splash');
       }
     } catch (e) {
       if (mounted) {

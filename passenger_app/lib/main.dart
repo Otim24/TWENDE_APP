@@ -7,7 +7,10 @@ import 'package:twende_passenger_app/features/auth/presentation/screens/login_sc
 import 'package:twende_passenger_app/features/auth/presentation/screens/otp_screen.dart';
 import 'package:twende_passenger_app/features/home/presentation/screens/home_wrapper.dart';
 import 'package:twende_passenger_app/features/booking/presentation/screens/search_results_screen.dart';
+import 'package:twende_passenger_app/features/booking/presentation/screens/bus_details_screen.dart';
+import 'package:twende_passenger_app/features/booking/presentation/screens/seat_selection_screen.dart';
 import 'package:twende_passenger_app/features/wallet/presentation/screens/deposit_screen.dart';
+import 'package:twende_passenger_app/features/auth/presentation/screens/splash_screen.dart';
 
 void main() {
   runApp(
@@ -37,8 +40,19 @@ final _router = GoRouter(
       },
     ),
     GoRoute(
+      path: '/splash',
+      builder: (context, state) => const SplashScreen(),
+    ),
+    GoRoute(
       path: '/home',
-      builder: (context, state) => const HomeWrapper(),
+      pageBuilder: (context, state) => CustomTransitionPage(
+        key: state.pageKey,
+        child: const HomeWrapper(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 800), // Smooth Cross-fade
+      ),
     ),
     GoRoute(
       path: '/wallet/deposit',
@@ -53,6 +67,17 @@ final _router = GoRouter(
           toLocation: extras['to'] ?? 'Unknown',
         );
       },
+    ),
+    GoRoute(
+      path: '/bus_details',
+      builder: (context, state) {
+        final bus = state.extra as Map<String, dynamic>;
+        return BusDetailsScreen(bus: bus);
+      },
+    ),
+    GoRoute(
+      path: '/seat_selection',
+      builder: (context, state) => const SeatSelectionScreen(),
     ),
     // Add more routes here
   ],

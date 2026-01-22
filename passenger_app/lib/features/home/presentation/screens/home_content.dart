@@ -14,15 +14,36 @@ class HomeContent extends StatefulWidget {
   State<HomeContent> createState() => _HomeContentState();
 }
 
-class _HomeContentState extends State<HomeContent> {
+class _HomeContentState extends State<HomeContent> with SingleTickerProviderStateMixin {
   bool _isSearching = false;
   final TextEditingController _fromController = TextEditingController();
   final TextEditingController _toController = TextEditingController();
+  late AnimationController _pulseController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _shadowBlurAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    _shadowBlurAnimation = Tween<double>(begin: 8.0, end: 16.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+  }
 
   @override
   void dispose() {
     _fromController.dispose();
     _toController.dispose();
+    _pulseController.dispose();
     super.dispose();
   }
 
@@ -134,75 +155,165 @@ class _HomeContentState extends State<HomeContent> {
                   toController: _toController,
                 ),
 
-                const SizedBox(height: 200), // Increased Spacing to clear Button + Carousel
+                const SizedBox(height: 250), // Increased Spacing (Button + Taller Carousel)
               ],
             ),
           ),
         ),
 
         // Pay for Ticket Button (Shifted Up)
+        // Pay for Ticket & Cargo Buttons (Services Section)
         Positioned(
-          bottom: 120, // Shifted up to make room for Carousel (100px + 20px padding)
-          left: 0,
-          right: 0,
-          child: Center(
-            child: GestureDetector(
-              onTap: () {
-                if (_fromController.text.isEmpty || _toController.text.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        "Please enter 'From' and 'To' locations first.",
-                        style: GoogleFonts.outfit(color: Colors.white),
-                      ),
-                      backgroundColor: Colors.redAccent,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                  return;
-                }
-                
-                context.push(
-                  '/search_results',
-                  extra: {
-                    'from': _fromController.text,
-                    'to': _toController.text,
-                  },
-                );
-              },
-              child: Container(
-                width: MediaQuery.of(context).size.width * 0.6, 
-                height: 50, 
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color(0xFF4A148C),
-                      const Color(0xFF7B1FA2),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF4A148C).withOpacity(0.4),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Text(
-                    "Pay for Ticket",
-                    style: GoogleFonts.outfit(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
+          bottom: 150, 
+          left: 24,
+          right: 24,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header Text
+              Text(
+                "Our Services",
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
-            ),
+              const SizedBox(height: 12),
+
+              // Pulsing Buttons Row
+              AnimatedBuilder(
+                animation: _pulseController,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: _scaleAnimation.value,
+                    child: Row(
+                      children: [
+                        // Pay for Ticket Button (Bus Icon)
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              if (_fromController.text.isEmpty || _toController.text.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      "Please enter 'From' and 'To' locations first.",
+                                      style: GoogleFonts.outfit(color: Colors.white),
+                                    ),
+                                    backgroundColor: Colors.redAccent,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                                return;
+                              }
+                              
+                              context.push(
+                                '/search_results',
+                                extra: {
+                                  'from': _fromController.text,
+                                  'to': _toController.text,
+                                },
+                              );
+                            },
+                            child: Container(
+                              height: 50, 
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    const Color(0xFF4A148C),
+                                    const Color(0xFF7B1FA2),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(30),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF4A148C).withOpacity(0.5),
+                                    blurRadius: _shadowBlurAnimation.value,
+                                    spreadRadius: 1,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.directions_bus_filled_rounded, color: Colors.white, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    "Pay Ticket",
+                                    style: GoogleFonts.outfit(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        
+                        const SizedBox(width: 16),
+
+                        // Cargo Button (Box Icon)
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              // TODO: Implement Cargo Flow
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text("Cargo Service Coming Soon!", style: GoogleFonts.outfit()),
+                                  backgroundColor: Colors.blueGrey,
+                                ),
+                              );
+                            },
+                            child: Container(
+                              height: 50, 
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    const Color(0xFF4A148C),
+                                    const Color(0xFF7B1FA2),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(30),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF4A148C).withOpacity(0.5),
+                                    blurRadius: _shadowBlurAnimation.value,
+                                    spreadRadius: 1,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.inventory_2_rounded, color: Colors.white, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    "Cargo",
+                                    style: GoogleFonts.outfit(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
         ),
 
