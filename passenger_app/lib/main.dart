@@ -11,6 +11,9 @@ import 'package:twende_passenger_app/features/booking/presentation/screens/bus_d
 import 'package:twende_passenger_app/features/booking/presentation/screens/seat_selection_screen.dart';
 import 'package:twende_passenger_app/features/wallet/presentation/screens/deposit_screen.dart';
 import 'package:twende_passenger_app/features/auth/presentation/screens/splash_screen.dart';
+import 'package:twende_passenger_app/features/payment/presentation/screens/payment_screen.dart';
+import 'package:twende_passenger_app/features/booking/presentation/screens/ticket_receipt_screen.dart';
+import 'package:twende_passenger_app/features/wallet/presentation/screens/wallet_dashboard_screen.dart';
 
 void main() {
   runApp(
@@ -55,6 +58,10 @@ final _router = GoRouter(
       ),
     ),
     GoRoute(
+      path: '/wallet',
+      builder: (context, state) => const WalletDashboardScreen(),
+    ),
+    GoRoute(
       path: '/wallet/deposit',
       builder: (context, state) => const DepositScreen(),
     ),
@@ -77,9 +84,33 @@ final _router = GoRouter(
     ),
     GoRoute(
       path: '/seat_selection',
-      builder: (context, state) => const SeatSelectionScreen(),
+      builder: (context, state) {
+        final busDetails = state.extra as Map<String, dynamic>;
+        return SeatSelectionScreen(busDetails: busDetails);
+      },
+    ),
+    GoRoute(
+      path: '/payment',
+      builder: (context, state) {
+        final extras = state.extra as Map<String, dynamic>;
+        return PaymentScreen(
+          busDetails: extras['busDetails'],
+          seatCount: extras['seatCount'],
+        );
+      },
+    ),
+    GoRoute(
+      path: '/receipt',
+      builder: (context, state) {
+        final bookingDetails = state.extra as Map<String, dynamic>;
+        return TicketReceiptScreen(bookingDetails: bookingDetails);
+      },
     ),
     // Add more routes here
+    GoRoute(
+      path: '/profile',
+      builder: (context, state) => const Scaffold(body: Center(child: Text("Profile Settings"))),
+    ),
   ],
 );
 

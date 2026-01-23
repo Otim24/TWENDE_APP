@@ -10,7 +10,7 @@ class WalletOptionsSheet extends StatefulWidget {
 }
 
 class _WalletOptionsSheetState extends State<WalletOptionsSheet> {
-  bool _isBalanceVisible = true;
+  bool _isBalanceVisible = false;
 
   @override
   Widget build(BuildContext context) {

@@ -5,7 +5,11 @@ import 'package:flutter/foundation.dart';
 class ApiEndpoints {
   // Use 127.0.0.1 with ADB Reverse (tcp:8000 tcp:8000)
   // This works for both Emulator and Physical Device (if adb reverse is run)
-  static const String baseUrl = "http://127.0.0.1:8000/api/v1";
+  static String get baseUrl {
+    if (kIsWeb) return "http://127.0.0.1:8000/api/v1";
+    if (Platform.isAndroid) return "http://192.168.100.19:8000/api/v1";
+    return "http://127.0.0.1:8000/api/v1";
+  }
 
   static const String login = "/auth/login";
   static const String signup = "/auth/signup";

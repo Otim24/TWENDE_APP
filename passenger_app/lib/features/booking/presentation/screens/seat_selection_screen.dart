@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class SeatSelectionScreen extends StatefulWidget {
-  const SeatSelectionScreen({super.key});
+  final Map<String, dynamic> busDetails;
+
+  const SeatSelectionScreen({super.key, required this.busDetails});
 
   @override
   State<SeatSelectionScreen> createState() => _SeatSelectionScreenState();
@@ -120,7 +122,18 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
                     onPressed: () {
                       // Calculate selected seats (Status 2)
                       int selectedCount = _seats.where((s) => s == 2).length;
-                      context.pop(selectedCount); // Return count to previous screen
+                      
+                      if (selectedCount == 0) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Please select at least one seat")),
+                        );
+                        return;
+                      }
+
+                      context.push('/payment', extra: {
+                        'busDetails': widget.busDetails,
+                        'seatCount': selectedCount,
+                      });
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF7B1FA2), // Purple Theme
@@ -128,7 +141,7 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     child: Text(
-                      "Confirm Selection",
+                      "Proceed to Pay",
                       style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                     ),
                   ),

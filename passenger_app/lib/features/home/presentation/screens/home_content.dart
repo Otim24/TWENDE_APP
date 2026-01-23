@@ -130,7 +130,7 @@ class _HomeContentState extends State<HomeContent> with SingleTickerProviderStat
                               Expanded(
                                 child: GestureDetector(
                                   onTap: () {
-                                    GoRouter.of(context).push('/wallet/deposit');
+                                    GoRouter.of(context).push('/wallet');
                                   },
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(vertical: 12),

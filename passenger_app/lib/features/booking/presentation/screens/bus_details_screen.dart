@@ -174,17 +174,10 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> with SingleTickerPr
                               // Pulsing "Book a Seat" Button
                               GestureDetector(
                                 onTap: () async {
-                                  // Wait for result from Seat Selection
-                                  final bookedCount = await context.push<int>('/seat_selection');
+                                  // Navigate to Seat Selection
+                                  context.push('/seat_selection', extra: widget.bus);
                                   
-                                  if (bookedCount != null && bookedCount > 0) {
-                                    setState(() {
-                                      _currentAvailableSeats = (_currentAvailableSeats - bookedCount).clamp(0, 50);
-                                    });
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text("Booked $bookedCount seats! ($_currentAvailableSeats remaining)", style: GoogleFonts.outfit())),
-                                    );
-                                  }
+
                                 },
                                 child: ScaleTransition(
                                   scale: _pulseAnimation,
@@ -198,10 +191,10 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> with SingleTickerPr
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        const Icon(Icons.touch_app_rounded, color: Colors.redAccent, size: 16),
+                                        const Icon(Icons.event_seat, color: Colors.redAccent, size: 16),
                                         const SizedBox(width: 6),
                                         Text(
-                                          "Book a Seat ($_currentAvailableSeats)", // New Text Format
+                                          "Select Seats ($_currentAvailableSeats)", // Updated Text
                                           style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                                         ),
                                       ],
@@ -245,48 +238,7 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> with SingleTickerPr
                       ],
                     ),
 
-                    // "Buy Ticket" Button - Top Right of the Sheet (Fixed Overlay)
-                    Positioned(
-                      top: 16,
-                      right: 16,
-                      child: GestureDetector(
-                        onTap: () {
-                          // TODO: Payment Flow
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text("Payment flow starting...", style: GoogleFonts.outfit())),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF4A148C), Color(0xFF7B1FA2)], // Purple Theme
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(30),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF4A148C).withOpacity(0.5),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                "Buy Ticket",
-                                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
-                              ),
-                              const SizedBox(width: 4),
-                              const Icon(Icons.arrow_forward, color: Colors.white, size: 16),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+
                   ],
                 ),
               );
