@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:dio/dio.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:twende_conductor_app/features/manifest/presentation/screens/conductor_home_screen.dart';
 
 class ScannerScreen extends StatefulWidget {
   const ScannerScreen({super.key});
@@ -11,26 +12,40 @@ class ScannerScreen extends StatefulWidget {
   State<ScannerScreen> createState() => _ScannerScreenState();
 }
 
-class _ScannerScreenState extends State<ScannerScreen> {
+class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProviderStateMixin {
   final MobileScannerController _controller = MobileScannerController(
     detectionSpeed: DetectionSpeed.noDuplicates,
     formats: [BarcodeFormat.qrCode],
   );
   
+  late AnimationController _animController;
+  late Animation<double> _animation;
+  
   bool _isScanning = true;
   bool _isProcessing = false;
-  String? _statusMessage;
-  bool? _isSuccess;
-  Timer? _resetTimer;
   
-  // Backend URL (Emulator or Physical Device)
-  // For physical device, replace 10.0.2.2 with actual IP e.g., 192.168.1.5
-  final String _baseUrl = 'http://10.0.2.2:8000/api/v1'; 
+  // Feedback
+  String? _feedbackMessage;
+  bool? _feedbackSuccess;
+  Timer? _feedbackTimer;
+  
+  // LAN Connection (Same WiFi)
+  final String _baseUrl = 'http://192.168.100.19:8000/api/v1'; 
+
+  @override
+  void initState() {
+    super.initState();
+    // Laser Animation
+    _animController = AnimationController(vsync: this, duration: const Duration(seconds: 2));
+    _animation = Tween<double>(begin: 0, end: 280).animate(CurvedAnimation(parent: _animController, curve: Curves.easeInOut));
+    _animController.repeat(reverse: true);
+  }
 
   @override
   void dispose() {
     _controller.dispose();
-    _resetTimer?.cancel();
+    _animController.dispose();
+    _feedbackTimer?.cancel();
     super.dispose();
   }
 
@@ -39,45 +54,47 @@ class _ScannerScreenState extends State<ScannerScreen> {
     
     setState(() {
       _isProcessing = true;
-      _isScanning = false; // Pause scanning visual feedback if needed
     });
 
     try {
-      // Dio Call
       final dio = Dio();
       final response = await dio.post(
         '$_baseUrl/conductor/verify_ticket', 
-        data: {'ticket_data': code}
+        data: {'ticket_data': code} // Sending as string
       );
 
       final valid = response.data['valid'] as bool;
       final message = response.data['message'] as String;
       
-      _showResult(valid, message);
+      _showFeedback(valid, message);
 
     } catch (e) {
-      _showResult(false, "Network Error: ${e.toString()}");
+      _showFeedback(false, "Network Error: ${e.toString()}");
     } finally {
       setState(() {
         _isProcessing = false;
+        // Keep stopped for a moment if success? No, continues scanning but delays next scan via logic
       });
     }
   }
 
-  void _showResult(bool success, String message) {
+  void _showFeedback(bool success, String message) {
     setState(() {
-      _isSuccess = success;
-      _statusMessage = message;
+      _feedbackSuccess = success;
+      _feedbackMessage = message;
+      // Pause laser
+      _animController.stop(); 
     });
 
-    // Auto-dismiss after 3 seconds
-    _resetTimer?.cancel();
-    _resetTimer = Timer(const Duration(seconds: 3), () {
+    // Vibration/Sound could happen here
+
+    _feedbackTimer?.cancel();
+    _feedbackTimer = Timer(const Duration(seconds: 3), () {
       if (mounted) {
         setState(() {
-          _isSuccess = null;
-          _statusMessage = null;
-          _isScanning = true;
+          _feedbackSuccess = null;
+          _feedbackMessage = null;
+          _animController.repeat(reverse: true); // Resume laser
         });
       }
     });
@@ -93,7 +110,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
           MobileScanner(
             controller: _controller,
             onDetect: (capture) {
-              if (!_isScanning || _isProcessing || _isSuccess != null) return;
+              if (_isProcessing || _feedbackSuccess != null) return;
               
               final List<Barcode> barcodes = capture.barcodes;
               if (barcodes.isNotEmpty && barcodes.first.rawValue != null) {
@@ -102,102 +119,192 @@ class _ScannerScreenState extends State<ScannerScreen> {
             },
           ),
 
-          // 2. Overlay (Semi-transparent Black with Cutout)
-          // Simplified implementation using Containers around a center transparent box
-          Column(
-            children: [
-              Expanded(child: Container(color: Colors.black54)),
-              Row(
-                children: [
-                  Expanded(child: Container(color: Colors.black54)),
-                  Container(
-                    width: 280,
-                    height: 280,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.white, width: 2),
-                      borderRadius: BorderRadius.circular(16),
-                      // transparent center
-                    ),
-                    child: Center(
-                       // Pulse effect or red line can go here
-                       child: _isProcessing 
-                         ? const CircularProgressIndicator(color: Colors.white)
-                         : Container(
-                             width: 260, height: 2, color: Colors.red.withOpacity(0.5)
-                           ),
-                    ),
-                  ),
-                  Expanded(child: Container(color: Colors.black54)),
-                ],
-              ),
-              Expanded(child: Container(
-                color: Colors.black54,
-                width: double.infinity,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      "Place QR Code within the frame",
-                      style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
-                    ),
-                    const SizedBox(height: 20),
-                    // Flashlight Toggle
-                    IconButton(
-                      icon: ValueListenableBuilder(
-                        valueListenable: _controller.torchState,
-                        builder: (context, state, child) {
-                          return Icon(
-                            state == TorchState.on ? Icons.flash_on : Icons.flash_off, 
-                            color: Colors.white, size: 30
-                          );
-                        },
-                      ),
-                      onPressed: () => _controller.toggleTorch(),
-                    ),
-                  ],
-                ),
-              )),
-            ],
+          // 2. Dark Overlay with Cutout
+          Container(
+            decoration: ShapeDecoration(
+              shape: OverlayShape(cutoutSize: 280),
+            ),
           ),
           
-          // 3. Status Alert Overlay (Green/Red)
-          if (_isSuccess != null)
-            Container(
-              color: _isSuccess! ? const Color(0xFF1B5E20) : const Color(0xFFB71C1C), // Strong Green or Red
-              width: double.infinity,
-              height: double.infinity,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+          // 3. Laser Animation
+          Center(
+            child: SizedBox(
+              width: 280,
+              height: 280,
+              child: Stack(
+                children: [
+                  // Corners (You could add corner images here)
+                  
+                  // Moving Laser Line
+                  AnimatedBuilder(
+                    animation: _animation,
+                    builder: (context, child) {
+                      if (_feedbackSuccess != null) return const SizedBox.shrink(); // Hide laser on result
+                      return Positioned(
+                        top: _animation.value,
+                        left: 0,
+                        right: 0,
+                        child: Container(
+                          height: 2,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Colors.transparent, Colors.redAccent.withOpacity(0.8), Colors.transparent]
+                            ),
+                            boxShadow: [
+                              BoxShadow(color: Colors.redAccent.withOpacity(0.5), blurRadius: 4, spreadRadius: 1)
+                            ]
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  
+                  // Processing Indicator
+                  if (_isProcessing)
+                    const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+                ],
+              ),
+            ),
+          ),
+
+          // 4. Feedback Banner (Top Dropdown)
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutBack,
+            top: _feedbackSuccess != null ? 50 : -150, // Slide in/out
+            left: 20,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                color: _feedbackSuccess == true ? Colors.green : Colors.red,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 4))],
+              ),
+              child: Row(
                 children: [
                   Icon(
-                    _isSuccess! ? Icons.check_circle_outline : Icons.error_outline,
-                    color: Colors.white,
-                    size: 100,
+                    _feedbackSuccess == true ? Icons.check_circle : Icons.error_outline,
+                    color: Colors.white, size: 32
                   ),
-                  const SizedBox(height: 32),
-                  Text(
-                    _isSuccess! ? "ALLOWED" : "STOP",
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: 48,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _statusMessage ?? "",
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: 20,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _feedbackSuccess == true ? "ALLOWED" : "STOP",
+                          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                        ),
+                        Text(
+                          _feedbackMessage ?? "",
+                          style: GoogleFonts.poppins(color: Colors.white.withOpacity(0.9), fontSize: 13),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
+          ),
+
+          // 5. Bottom Controls
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 50),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    "Align QR Code within the frame",
+                    style: GoogleFonts.poppins(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 20),
+                  IconButton(
+                    onPressed: () => _controller.toggleTorch(),
+                    icon: ValueListenableBuilder(
+                      valueListenable: _controller,
+                      builder: (context, state, child) {
+                        return Icon(
+                          state.torchState == TorchState.on ? Icons.flash_on : Icons.flash_off,
+                          color: Colors.white, size: 30
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Close Button
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white70, size: 30),
+                    onPressed: () {
+                         if (Navigator.canPop(context)) {
+                           Navigator.pop(context);
+                         } else {
+                           Navigator.pushReplacement(
+                             context, 
+                             MaterialPageRoute(builder: (_) => const ConductorHomeScreen())
+                           );
+                         }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
+}
+
+// Custom Painter for the Cutout Overlay
+class OverlayShape extends ShapeBorder {
+  final double cutoutSize;
+  const OverlayShape({required this.cutoutSize});
+
+  @override
+  EdgeInsetsGeometry get dimensions => EdgeInsets.zero;
+
+  @override
+  Path getInnerPath(Rect rect, {TextDirection? textDirection}) {
+    return Path()
+      ..addRRect(RRect.fromRectAndRadius(
+          Rect.fromCenter(center: rect.center, width: cutoutSize, height: cutoutSize),
+          const Radius.circular(16)))
+      ..fillType = PathFillType.evenOdd;
+  }
+
+  @override
+  Path getOuterPath(Rect rect, {TextDirection? textDirection}) {
+    final Path path = Path()..addRect(rect);
+    final Path cutout = getInnerPath(rect);
+    return Path.combine(PathOperation.difference, path, cutout);
+  }
+
+  @override
+  void paint(Canvas canvas, Rect rect, {TextDirection? textDirection}) {
+    final paint = Paint()..color = Colors.black54; // Semi-transparent black
+    canvas.drawPath(getOuterPath(rect), paint);
+    
+    // Draw white border around cutout
+    final borderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+      
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+          Rect.fromCenter(center: rect.center, width: cutoutSize, height: cutoutSize),
+          const Radius.circular(16)
+      ), 
+      borderPaint
+    );
+  }
+  
+  @override
+  ShapeBorder scale(double t) => this;
 }

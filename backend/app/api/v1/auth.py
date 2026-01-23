@@ -73,3 +73,30 @@ async def verify_otp(payload: OTPVerify):
     await redis_client.delete(f"otp:{payload.phone}")
     
     return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer"}
+
+class LoginRequest(BaseModel):
+    phone: str
+    password: str
+
+@router.post("/login", response_model=Token)
+async def login(payload: LoginRequest):
+    user = await User.get_or_none(phone=payload.phone)
+    
+    # Simple check for now. In real app, we verify hash.
+    # We will assume if password matches plain text or verify_password(payload.password, user.password_hash)
+    # Since we set empty password for passengers, Conductors need to be seeded with a password.
+    # For MVP: If user exists and role is CONDUCTOR, we verify password.
+    
+    if not user:
+         raise HTTPException(status_code=400, detail="Invalid credentials")
+
+    # TODO: Use proper hashing (bcrypt)
+    # For now, simplistic check: if user.password_hash == payload.password
+    if user.password_hash != payload.password:
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+
+    access_token = create_access_token(
+        data={"sub": str(user.id), "role": user.role.value}
+    )
+    return {"access_token": access_token, "token_type": "bearer"}

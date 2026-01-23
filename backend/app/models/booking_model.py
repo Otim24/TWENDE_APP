@@ -6,6 +6,7 @@ class BookingStatus(str, Enum):
     LOCKED = "LOCKED"
     PAID = "PAID"
     CANCELLED = "CANCELLED"
+    USED = "USED"
 
 class Booking(TimestampMixin, models.Model):
     id = fields.IntField(pk=True)

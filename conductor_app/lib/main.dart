@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:twende_conductor_app/features/scan/presentation/screens/scanner_screen.dart';
+import 'package:twende_conductor_app/features/auth/presentation/screens/login_screen.dart';
 
 void main() {
   runApp(const TwendeConductorApp());
@@ -19,7 +19,8 @@ class TwendeConductorApp extends StatelessWidget {
         useMaterial3: true,
         textTheme: GoogleFonts.poppinsTextTheme(),
       ),
-      home: const ScannerScreen(),
+      home: const LoginScreen(),
     );
   }
 }
+

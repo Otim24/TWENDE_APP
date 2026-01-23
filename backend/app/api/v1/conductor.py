@@ -1,8 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from app.api import deps
-from app.models.booking_model import Booking
-from app.models.trip_model import Trip
+from fastapi import APIRouter, HTTPException
+from app.models.booking_model import Booking, BookingStatus
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -16,53 +13,157 @@ class TicketVerifyResponse(BaseModel):
     booking_details: dict | None = None
 
 @router.post("/verify_ticket", response_model=TicketVerifyResponse)
-def verify_ticket(
-    request: TicketVerifyRequest,
-    db: Session = Depends(deps.get_db),
-    # In a real app, we'd add current_user dependency to ensure it's a conductor
-):
-    # Expected Format: "TWENDE-TRIP-{trip_id}-SEATS-{seat_count}-BOOKING-{booking_id}"
-    # Or simplified just booking ID if we change QR format. 
-    # Let's assume the QR contains the Booking ID or a unique ticket string.
-    # For now, let's assume the QR string *IS* the Booking ID or contains it.
+async def verify_ticket(request: TicketVerifyRequest):
+    booking_id_str = request.ticket_data
     
-    # Let's try to look up by ID if it looks like a UUID, or parse properly
-    # Implementation Plan said: "TWENDE-TRIP-{id}-SEATS-{seats}"... wait, that's not unique enough if user books multiple times.
-    # The Receipt Screen (TicketReceiptScreen) likely encodes the Booking ID.
-    # Let's check TicketReceiptScreen to be sure what we are scanning.
-    
-    # Actually, I'll just look for the Booking ID in the payload or assume the payload IS the ID for simplicity first.
-    # If the payload contains "TWENDE", I'll try to extract the ID.
-    
-    # Simpler approach: The QR code should ideally just be the Booking ID (UUID).
-    
-    booking_id = request.ticket_data
-    if "TWENDE" in booking_id:
-       # Clean it if needed, or if we defined a format in Receipt Screen, we parse it.
-       # For now, I will treat the input as the Booking UUID directly for robustness.
-       pass
+    # Basic parsing if needed. For now assuming ticket_data Is the ID.
+    try:
+        booking_id = int(booking_id_str)
+    except ValueError:
+        return TicketVerifyResponse(valid=False, message="INVALID FORMAT: Ticket ID must be a number")
 
-    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    booking = await Booking.get_or_none(id=booking_id).prefetch_related("user", "trip")
     
     if not booking:
         return TicketVerifyResponse(valid=False, message="INVALID TICKET: Not Found")
 
-    if booking.status == "USED":
+    if booking.status == BookingStatus.USED:
         return TicketVerifyResponse(valid=False, message="ALREADY USED! Ticket scanned previously.")
 
-    if booking.status != "PAID":
+    if booking.status != BookingStatus.PAID:
         return TicketVerifyResponse(valid=False, message=f"INVALID STATUS: {booking.status}")
 
     # If Valid and PAID, mark as USED
-    booking.status = "USED"
-    db.commit()
+    booking.status = BookingStatus.USED
+    await booking.save()
     
     return TicketVerifyResponse(
         valid=True, 
         message="WELCOME ABOARD! Ticket Verified.",
         booking_details={
             "passenger": booking.user.full_name if booking.user else "Unknown",
-            "seats": booking.seat_count,
+            "seats": 1, # Model has seat_number, implying 1 seat per booking row
+            "seat_number": booking.seat_number,
             "route": "Kampala - Busia" # Dynamic later
         }
     )
+
+from app.models.trip_model import Trip, TripStatus
+
+class TripResponse(BaseModel):
+    id: int
+    route_name: str
+    departure_time: str
+    status: str
+    occupied_seats: int
+    total_seats: int
+
+@router.get("/trips", response_model=list[TripResponse])
+async def get_trips():
+    # In real app, filter by conductor assignment. 
+    # For MVP, returning all SCHEDULED or BOARDING trips.
+    # Remove prefetch to avoid "route_id does not exist" if DB schema is out of sync
+    trips = await Trip.filter(
+        status__in=[TripStatus.SCHEDULED, TripStatus.BOARDING]
+    ).all()
+    
+    # Manually fetch to be safe
+    for t in trips:
+        await t.fetch_related("bus", "route", "bookings")
+    
+    response = []
+    for trip in trips:
+        try:
+            # Safe Access Helpers
+            def safe_get(obj, attr, default=None):
+                val = getattr(obj, attr, default)
+                if val is None: return default
+                return val
+
+            # Occupancy
+            occupied = 0
+            bookings = safe_get(trip, "bookings", [])
+            if bookings:
+                 occupied = len([b for b in bookings if getattr(b, "status", None) in [BookingStatus.PAID, BookingStatus.USED]])
+            
+            # Status
+            raw_status = safe_get(trip, "status", "SCHEDULED")
+            status_str = getattr(raw_status, "value", str(raw_status))
+
+            # Route Name
+            route_obj = safe_get(trip, "route", None)
+            r_name = safe_get(route_obj, "name", "Unknown Route")
+
+            # Bus
+            bus_obj = safe_get(trip, "bus", None)
+            total = safe_get(bus_obj, "total_seats", 60)
+
+            response.append(TripResponse(
+                id=trip.id,
+                route_name=str(r_name),
+                departure_time=str(safe_get(trip, "departure_time", "")),
+                status=str(status_str),
+                occupied_seats=occupied,
+                total_seats=total
+            ))
+        except Exception as e:
+            print(f"Error processing trip {trip.id}: {e}")
+            continue # Skip bad records instead of crashing everything
+
+    return response
+    return response
+
+class ManifestItem(BaseModel):
+    seat_number: int
+    status: str # AVAILABLE, BOOKED, OCCUPIED
+    passenger_name: str | None = None
+    passenger_phone: str | None = None
+    booking_id: int | None = None
+
+@router.get("/trips/{trip_id}/manifest", response_model=list[ManifestItem])
+async def get_trip_manifest(trip_id: int):
+    trip = await Trip.get_or_none(id=trip_id).prefetch_related("bus")
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+        
+    bookings = await Booking.filter(trip_id=trip_id).prefetch_related("user")
+    
+    # Map bookings by seat number
+    booking_map = {b.seat_number: b for b in bookings}
+    
+    total_seats = trip.bus.total_seats if trip.bus else 60
+    manifest = []
+    
+    for i in range(1, total_seats + 1):
+        booking = booking_map.get(i)
+        
+        item_status = "AVAILABLE"
+        name = None
+        phone = None
+        b_id = None
+        
+        if booking:
+            b_id = booking.id
+            if booking.status == BookingStatus.USED:
+                item_status = "OCCUPIED" 
+                name = booking.user.full_name if booking.user else "Unknown"
+                phone = booking.user.phone if booking.user else None
+            elif booking.status == BookingStatus.PAID:
+                item_status = "BOOKED"
+                name = booking.user.full_name if booking.user else "Unknown"
+                phone = booking.user.phone if booking.user else None
+            elif booking.status == BookingStatus.LOCKED:
+                 # Depending on business logic, maybe show as BOOKED or AVAILABLE?
+                 # Let's show as BOOKED but maybe different color in future.
+                 item_status = "BOOKED" 
+                 name = "Reserved"
+        
+        manifest.append(ManifestItem(
+            seat_number=i,
+            status=item_status,
+            passenger_name=name,
+            passenger_phone=phone,
+            booking_id=b_id
+        ))
+        
+    return manifest
