@@ -39,7 +39,8 @@ class _ConductorHomeScreenState extends State<ConductorHomeScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-           _error = "Failed to load trips. Check connection.";
+           // Show detailed error for debugging
+           _error = "Err: ${e.toString()}";
            _isLoading = false;
         });
       }

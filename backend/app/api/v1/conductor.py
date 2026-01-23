@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from app.models.booking_model import Booking, BookingStatus
+from app.models.trip_model import Trip, TripStatus
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -48,7 +49,7 @@ async def verify_ticket(request: TicketVerifyRequest):
         }
     )
 
-from app.models.trip_model import Trip, TripStatus
+
 
 class TripResponse(BaseModel):
     id: int
@@ -110,7 +111,6 @@ async def get_trips():
             print(f"Error processing trip {trip.id}: {e}")
             continue # Skip bad records instead of crashing everything
 
-    return response
     return response
 
 class ManifestItem(BaseModel):

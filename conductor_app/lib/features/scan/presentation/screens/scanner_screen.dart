@@ -29,8 +29,8 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
   bool? _feedbackSuccess;
   Timer? _feedbackTimer;
   
-  // LAN Connection (Same WiFi)
-  final String _baseUrl = 'http://192.168.100.19:8000/api/v1'; 
+  // Using ADB Reverse Tunnel for reliability
+  final String _baseUrl = 'http://127.0.0.1:8000/api/v1'; 
 
   @override
   void initState() {

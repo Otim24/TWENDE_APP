@@ -17,7 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   String? _error;
   
-  // LAN Connection (Same WiFi)
+  // LAN Connection (Same WiFi) -- More stable for Wireless ADB
   final String _baseUrl = 'http://192.168.100.19:8000/api/v1/auth';
 
   Future<void> _login() async {
@@ -47,7 +47,8 @@ class _LoginScreenState extends State<LoginScreen> {
           if (e is DioException && e.response != null) {
             _error = e.response?.data['detail'] ?? "Login failed";
           } else {
-             _error = "Network Error";
+             // Show the RAW error to debug
+             _error = "Err: ${e.toString()}";
           }
         });
       }
