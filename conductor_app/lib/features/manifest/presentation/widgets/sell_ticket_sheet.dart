@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:dio/dio.dart';
 import 'seat_selection_modal.dart';
+import '../screens/conductor_ticket_receipt_screen.dart';
 
 class SellTicketSheet extends StatefulWidget {
   final Map<String, dynamic>? trip;
@@ -95,10 +96,24 @@ class _SellTicketSheetState extends State<SellTicketSheet> with SingleTickerProv
       
       if (response.data['success'] == true) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response.data['message']), backgroundColor: Colors.green)
-        );
         widget.onSuccess();
+        
+        // Show Receipt Screen
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ConductorTicketReceiptScreen(
+              ticketDetails: {
+                'trip_id': widget.trip?['id'] ?? 999,
+                'passenger_name': _nameController.text,
+                'seat_number': _selectedSeat,
+                'route_name': widget.trip?['route']?['name'] ?? 'Kampala - Busia',
+                'travel_date': 'Today', // Would come from real trip data
+                'price': widget.trip?['price'] ?? 35000,
+              }
+            )
+          )
+        );
       }
       
     } catch (e) {
