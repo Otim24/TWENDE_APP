@@ -38,16 +38,67 @@ async def verify_ticket(request: TicketVerifyRequest):
     booking.status = BookingStatus.USED
     await booking.save()
     
+
     return TicketVerifyResponse(
         valid=True, 
         message="WELCOME ABOARD! Ticket Verified.",
         booking_details={
             "passenger": booking.user.full_name if booking.user else "Unknown",
-            "seats": 1, # Model has seat_number, implying 1 seat per booking row
+            "seats": 1, 
             "seat_number": booking.seat_number,
-            "route": "Kampala - Busia" # Dynamic later
+            "route": "Kampala - Busia" 
         }
     )
+
+class SellTicketRequest(BaseModel):
+    trip_id: int
+    seat_number: int
+    passenger_name: str
+    passenger_phone: str
+    payment_method: str # CASH, MOMO
+
+@router.post("/sell_ticket")
+async def sell_ticket(payload: SellTicketRequest):
+    # 1. Check Trip
+    trip = await Trip.get_or_none(id=payload.trip_id)
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+
+    # 2. Check Seat Availability
+    existing = await Booking.filter(trip=trip, seat_number=payload.seat_number).exists()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Seat {payload.seat_number} is already taken")
+
+    # 3. Find or Create User (Walk-in)
+    from app.models.user_model import User, UserRole
+    from app.models.wallet_model import Wallet
+    
+    user = await User.get_or_none(phone=payload.passenger_phone)
+    if not user:
+        # Create Walk-in User
+        user = await User.create(
+            phone=payload.passenger_phone,
+            full_name=payload.passenger_name,
+            role=UserRole.PASSENGER,
+            password_hash="" # Walk-in doesn't have password yet
+        )
+        await Wallet.create(user=user)
+    
+    # 4. Create Booking
+    # For MVP, assuming payment was successful locally (Cash/MoMo)
+    booking = await Booking.create(
+        trip=trip,
+        user=user,
+        seat_number=payload.seat_number,
+        status=BookingStatus.PAID, # Auto-mark as PAID
+        qr_code_data=f"TICKET-{trip.id}-{payload.seat_number}" # Simple QR logic
+    )
+
+    return {
+        "success": True, 
+        "booking_id": booking.id, 
+        "message": f"Ticket Sold! Seat {payload.seat_number} Assigned."
+    }
 
 
 

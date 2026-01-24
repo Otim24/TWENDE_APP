@@ -99,4 +99,4 @@ async def login(payload: LoginRequest):
     access_token = create_access_token(
         data={"sub": str(user.id), "role": user.role.value}
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer", "user_name": user.full_name}

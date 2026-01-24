@@ -17,7 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   String? _error;
   
-  // LAN Connection (Same WiFi) -- More stable for Wireless ADB
+  // LAN Connection (Firewall Unblocked)
   final String _baseUrl = 'http://192.168.100.19:8000/api/v1/auth';
 
   Future<void> _login() async {
@@ -37,7 +37,9 @@ class _LoginScreenState extends State<LoginScreen> {
         if (mounted) {
            Navigator.pushReplacement(
             context, 
-            MaterialPageRoute(builder: (_) => const ConductorHomeScreen())
+            MaterialPageRoute(builder: (_) => ConductorHomeScreen(
+              userName: response.data['user_name'] ?? "Twende Crew",
+            ))
           );
         }
       }

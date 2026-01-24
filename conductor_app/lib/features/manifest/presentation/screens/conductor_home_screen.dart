@@ -1,50 +1,166 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:dio/dio.dart';
-import 'package:twende_conductor_app/features/manifest/presentation/screens/trip_dashboard_screen.dart';
+import 'package:twende_conductor_app/features/manifest/presentation/tabs/dashboard_tab.dart';
+import 'package:twende_conductor_app/features/manifest/presentation/widgets/manual_entry_sheet.dart';
+import 'package:twende_conductor_app/features/manifest/presentation/widgets/sell_ticket_sheet.dart';
+import 'package:twende_conductor_app/features/manifest/presentation/tabs/passenger_list_tab.dart';
+import 'package:twende_conductor_app/features/manifest/presentation/tabs/seat_map_tab.dart';
 import 'package:twende_conductor_app/features/scan/presentation/screens/scanner_screen.dart';
-
+import 'package:flutter/rendering.dart';
 class ConductorHomeScreen extends StatefulWidget {
-  const ConductorHomeScreen({super.key});
+  final String userName;
+  const ConductorHomeScreen({super.key, required this.userName});
 
   @override
   State<ConductorHomeScreen> createState() => _ConductorHomeScreenState();
 }
 
 class _ConductorHomeScreenState extends State<ConductorHomeScreen> {
+  int _selectedIndex = 0;
   bool _isLoading = true;
-  List<Map<String, dynamic>> _trips = [];
   String? _error;
+  
+  // Data State
+  List<dynamic> _manifest = [];
+  Map<String, dynamic>? _activeTrip; // Computed from manifest for now
 
-  // Assuming same LAN IP
+  // LAN Connection
   final String _baseUrl = 'http://192.168.100.19:8000/api/v1/conductor';
 
   @override
   void initState() {
     super.initState();
-    _fetchTrips();
+    _fetchData();
   }
 
-  Future<void> _fetchTrips() async {
+  Future<void> _fetchData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
     try {
       final dio = Dio();
-      final response = await dio.get('$_baseUrl/trips');
       
-      if (response.statusCode == 200) {
-        setState(() {
-          _trips = List<Map<String, dynamic>>.from(response.data);
-          _isLoading = false;
-        });
+      // 1. Fetch Trips (for Dashboard)
+      final tripsResponse = await dio.get('$_baseUrl/trips');
+      if (tripsResponse.statusCode == 200 && (tripsResponse.data as List).isNotEmpty) {
+        _activeTrip = tripsResponse.data[0]; 
+      } else {
+        // DEMO MODE: Force UI to show "Kampala - Lira" if no API data exists
+        _activeTrip = {
+          'id': 999,
+          'route_name': 'Kampala - Lira',
+          'bus_plate': 'UAX 345F',
+          'departure_time': '10:00 AM',
+          'total_seats': 60,
+          'occupied_seats': 47,
+          'status': 'SCHEDULED'
+        };
       }
+
+      // 2. Fetch Manifest (if we have a trip)
+      if (_activeTrip != null) {
+        final id = _activeTrip!['id'];
+        
+        if (id == 999) {
+          // DEMO MODE: Generate Fake Manifest
+          _manifest = _generateDemoManifest();
+        } else {
+          final manifestResponse = await dio.get('$_baseUrl/trips/$id/manifest');
+          if (manifestResponse.statusCode == 200) {
+            _manifest = manifestResponse.data;
+          }
+        }
+      }
+      
+      setState(() => _isLoading = false);
+
     } catch (e) {
       if (mounted) {
         setState(() {
-           // Show detailed error for debugging
            _error = "Err: ${e.toString()}";
            _isLoading = false;
         });
       }
-      print("Error loading trips: $e");
+      print("Error loading data: $e");
+    }
+  }
+
+  // Action: Manual Board (From List or Map)
+  Future<void> _manualBoard(int bookingId) async {
+    try {
+      final dio = Dio();
+      final response = await dio.post(
+        '$_baseUrl/verify_ticket', 
+        data: {'ticket_data': bookingId.toString()}
+      );
+      
+      if (response.data['valid'] == true) {
+        // Optimistic Update
+        setState(() {
+           final index = _manifest.indexWhere((p) => p['booking_id'] == bookingId);
+           if (index != -1) {
+             _manifest[index]['status'] = 'USED'; // Mark as Used/Boarded
+           }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Passenger Boarded Successfully"), backgroundColor: Colors.green)
+        );
+        // Refresh to be safe
+        _fetchData();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: ${e.toString()}"), backgroundColor: Colors.red)
+      );
+    }
+  }
+
+  List<dynamic> _generateDemoManifest() {
+    List<dynamic> list = [];
+    // Generate 60 seats
+    for (int i = 1; i <= 60; i++) {
+      String status = "AVAILABLE";
+      String? name;
+      String? phone;
+      
+      // Fake some data
+      if (i <= 45) { // 45 Occupied
+         if (i % 2 == 0) {
+           status = "USED"; // Boarded
+           name = "Passenger $i";
+           phone = "+256 700 0000$i";
+         } else {
+           status = "OCCUPIED"; // Booked/Paid
+           name = "Passenger $i"; 
+           phone = "+256 700 0000$i";
+         }
+      }
+      
+      list.add({
+        'seat_number': i,
+        'status': status,
+        'passenger_name': name,
+        'passenger_phone': phone,
+        'booking_id': 1000 + i // Fake IDs
+      });
+    }
+    return list;
+  }
+
+  void _onSwitchTab(int index) {
+    setState(() => _selectedIndex = index);
+  }
+
+  bool _isNavVisible = true;
+  
+  void _onScroll(UserScrollNotification notification) {
+    if (notification.direction == ScrollDirection.reverse && _isNavVisible) {
+      if (mounted) setState(() => _isNavVisible = false);
+    } else if (notification.direction == ScrollDirection.forward && !_isNavVisible) {
+      if (mounted) setState(() => _isNavVisible = true);
     }
   }
 
@@ -52,254 +168,263 @@ class _ConductorHomeScreenState extends State<ConductorHomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // 1. Main Content
-          SafeArea(
-            child: Column(
-              children: [
-                _buildHeader(),
-                Expanded(
-                  child: _isLoading 
-                    ? const Center(child: CircularProgressIndicator(color: Color(0xFF7B1FA2)))
-                    : _error != null 
-                        ? Center(child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(_error!, style: GoogleFonts.poppins(color: Colors.red)),
-                              TextButton(onPressed: _fetchTrips, child: const Text("Retry", style: TextStyle(color: Colors.white)))
-                            ],
-                          ))
-                        : _trips.isEmpty
-                            ? Center(child: Text("No scheduled trips found.", style: GoogleFonts.poppins(color: Colors.white70)))
-                            : ListView.builder(
-                                padding: const EdgeInsets.fromLTRB(16, 16, 16, 100), // Bottom padding for Pill
-                                itemCount: _trips.length,
-                                itemBuilder: (context, index) {
-                                  return _buildTripCard(_trips[index]);
-                                },
-                              ),
-                ),
-              ],
-            ),
-          ),
-
-          // 2. Floating Pill Navigation
-          Positioned(
-            bottom: 30,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: _buildNavigationPill(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Row(
-        children: [
-          // Overlapping Profiles
-          SizedBox(
-            width: 70,
-            height: 40,
-            child: Stack(
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.black, width: 2),
-                    ),
-                    child: const CircleAvatar(
-                      radius: 18,
-                      backgroundColor: Colors.grey,
-                      child: Icon(Icons.person, color: Colors.white, size: 20),
-                    ),
+      body: NotificationListener<UserScrollNotification>(
+        onNotification: (notification) {
+          _onScroll(notification);
+          return true;
+        },
+        child: Stack(
+          children: [
+            SafeArea(
+              child: Column(
+                children: [
+                  _buildHeader(),
+                  Expanded(
+                    child: _isLoading 
+                      ? const Center(child: CircularProgressIndicator(color: Color(0xFF7B1FA2)))
+                      : _error != null 
+                          ? Center(child: TextButton(onPressed: _fetchData, child: Text(_error!, style: const TextStyle(color: Colors.red))))
+                          : IndexedStack(
+                              index: _selectedIndex,
+                              children: [
+                                // Tab 0: Dashboard
+                                DashboardTab(
+                                  trip: _activeTrip, 
+                                  onStartTrip: () {}, 
+                                  onSwitchTab: _onSwitchTab,
+                                  onManualEntry: () {
+                                    showModalBottomSheet(
+                                      context: context,
+                                      isScrollControlled: true,
+                                      backgroundColor: Colors.transparent,
+                                      builder: (context) => ManualEntrySheet(
+                                        manifest: _manifest,
+                                        onBoardPassenger: _manualBoard,
+                                      ),
+                                    );
+                                  },
+                                  onSellTicket: () {
+                                    showModalBottomSheet(
+                                      context: context,
+                                      isScrollControlled: true,
+                                      backgroundColor: Colors.transparent,
+                                      builder: (context) => SellTicketSheet(
+                                        trip: _activeTrip,
+                                        manifest: _manifest,
+                                        onSuccess: () {
+                                          _fetchData(); // Refresh manifest
+                                        },
+                                      ),
+                                    );
+                                  },
+                                ),
+                                
+                                // Tab 1: Passenger List
+                                PassengerListTab(
+                                  manifest: _manifest,
+                                  onBoardPassenger: _manualBoard,
+                                ),
+                                
+                                // Tab 2: Seat Map
+                                SeatMapTab(
+                                  manifest: _manifest,
+                                  onSeatTap: (seat) {}, 
+                                ),
+                                
+                                // Tab 3: Scanner Placeholder
+                                Center(
+                                  child: ElevatedButton.icon(
+                                    icon: const Icon(Icons.camera_alt),
+                                    label: const Text("Open Camera"),
+                                    onPressed: () {
+                                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ScannerScreen()));
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
                   ),
-                ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.black, width: 2),
-                    ),
-                    child: const CircleAvatar(
-                      radius: 18,
-                      backgroundColor: Color(0xFF7B1FA2), // Purple for Conductor
-                      child: Icon(Icons.confirmation_number, color: Colors.white, size: 20),
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Twende Crew",
-                style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12),
-              ),
-              Text(
-                "My Trips",
-                style: GoogleFonts.poppins(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTripCard(Map<String, dynamic> trip) {
-    double occupancy = trip['occupied_seats'] / trip['total_seats'];
-    Color statusColor = occupancy > 0.8 ? Colors.redAccent : Colors.greenAccent;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => TripDashboardScreen(
-                  tripId: trip['id'],
-                  tripName: trip['route_name'],
-                  tripStats: "${trip['occupied_seats']}/${trip['total_seats']}",
-                ),
-              ),
-            );
-          },
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        trip['route_name'] ?? 'Unknown Route',
-                        style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF7B1FA2).withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        trip['status'] ?? 'SCHEDULED',
-                        style: GoogleFonts.poppins(color: const Color(0xFFE040FB), fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Icon(Icons.access_time, size: 16, color: Colors.grey[400]),
-                    const SizedBox(width: 6),
-                    Text(trip['departure_time'] ?? '', style: GoogleFonts.poppins(color: Colors.grey[400])),
-                    const Spacer(),
-                    Icon(Icons.event_seat, size: 16, color: statusColor),
-                    const SizedBox(width: 6),
-                    Text(
-                      "${trip['occupied_seats']}/${trip['total_seats']}",
-                      style: GoogleFonts.poppins(color: statusColor, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ],
+            
+            // Bottom Pill Navigation (Animated)
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              bottom: _isNavVisible ? 30 : -100, // Hide below screen
+              left: 20,
+              right: 20,
+              child: _buildPillNav(),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
-
-  Widget _buildNavigationPill() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFF2D2D2D), // Dark Grey Pill
-        borderRadius: BorderRadius.circular(40),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.5),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          )
-        ],
-        border: Border.all(color: Colors.white24, width: 0.5),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // HOME (Active)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF7B1FA2), Color(0xFF4A148C)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(30),
-            ),
-            child: Row(
+  
+  Widget _buildHeader() {
+    String title = "Conductor App";
+    if (_selectedIndex == 1) title = "Passenger List";
+    if (_selectedIndex == 2) title = "Seat Map";
+    if (_selectedIndex == 3) title = "Scan Ticket";
+    
+    // Only show Welcome header on Home Tab (0)
+    if (_selectedIndex == 0) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
               children: [
-                const Icon(Icons.home_filled, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Text("Home", style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+                // Profile Avatar
+                Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFF7B1FA2), width: 2),
+                  ),
+                  child: const CircleAvatar(
+                    radius: 20,
+                    backgroundColor: Color(0xFF1E1E1E),
+                    child: Icon(Icons.person, color: Colors.white, size: 24),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Welcome Back!",
+                      style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12),
+                    ),
+                    Text(
+                      widget.userName,
+                      style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
               ],
             ),
-          ),
-          
-          const SizedBox(width: 8),
-
-          // QR (Action)
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ScannerScreen())
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: Row(
+            
+            // Notification Bell
+            GestureDetector(
+              onTap: () {
+                // Functional Bell
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text("No new notifications", style: GoogleFonts.poppins()),
+                    backgroundColor: const Color(0xFF1E1E1E),
+                    behavior: SnackBarBehavior.floating,
+                    action: SnackBarAction(label: "Dismiss", onPressed: () {}, textColor: const Color(0xFFE040FB)),
+                  )
+                );
+              },
+              child: Stack(
                 children: [
-                  const Icon(Icons.qr_code_scanner, color: Colors.grey, size: 20),
-                  const SizedBox(width: 8),
-                  Text("Scan", style: GoogleFonts.poppins(color: Colors.grey)),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.notifications_outlined, color: Colors.white, size: 24),
+                  ),
+                  Positioned(
+                    right: 10, 
+                    top: 10, 
+                    child: Container(
+                      width: 8, height: 8, 
+                      decoration: const BoxDecoration(color: Color(0xFFE040FB), shape: BoxShape.circle)
+                    )
+                  )
                 ],
               ),
-            ),
+            )
+          ],
+        ),
+      );
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+               if (_selectedIndex != 0)
+                 IconButton(
+                   icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 18),
+                   onPressed: () => _onSwitchTab(0),
+                 ),
+               const Icon(Icons.directions_bus, color: Colors.white),
+               const SizedBox(width: 10),
+               Text(title, style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
           ),
+          Stack(
+            children: [
+              const Icon(Icons.notifications, color: Colors.white),
+              Positioned(
+                right: 0, 
+                top: 0, 
+                child: Container(
+                  width: 8, height: 8, 
+                  decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)
+                )
+              )
+            ],
+          )
         ],
+      ),
+    );
+  }
+
+  Widget _buildPillNav() {
+    return Container(
+      height: 70,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(35),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10, offset: const Offset(0, 5))
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _navItem(0, Icons.dashboard, "Home"),
+          _navItem(1, Icons.people, "List"),
+          _navItem(2, Icons.grid_view, "Map"),
+          _navItem(3, Icons.qr_code_scanner, "Scan"),
+        ],
+      ),
+    );
+  }
+
+  Widget _navItem(int index, IconData icon, String label) {
+    bool isSelected = _selectedIndex == index;
+    return GestureDetector(
+      onTap: () => _onSwitchTab(index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: isSelected 
+          ? BoxDecoration(
+              color: const Color(0xFF7B1FA2),
+              borderRadius: BorderRadius.circular(20),
+            )
+          : null,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: isSelected ? Colors.white : Colors.grey, size: 24),
+            if (isSelected) 
+              Text(label, style: GoogleFonts.poppins(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold))
+          ],
+        ),
       ),
     );
   }

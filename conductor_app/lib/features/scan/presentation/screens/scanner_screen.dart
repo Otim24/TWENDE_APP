@@ -241,14 +241,7 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
                   IconButton(
                     icon: const Icon(Icons.close, color: Colors.white70, size: 30),
                     onPressed: () {
-                         if (Navigator.canPop(context)) {
-                           Navigator.pop(context);
-                         } else {
-                           Navigator.pushReplacement(
-                             context, 
-                             MaterialPageRoute(builder: (_) => const ConductorHomeScreen())
-                           );
-                         }
+                         Navigator.of(context).pop();
                     },
                   ),
                 ],
