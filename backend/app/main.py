@@ -20,6 +20,9 @@ app.include_router(wallet.router, prefix="/api/v1/wallet", tags=["wallet"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
 app.include_router(conductor.router, prefix="/api/v1/conductor", tags=["conductor"])
 
+from app.api.v1 import tracking
+app.include_router(tracking.router, prefix="/api/v1/tracking", tags=["tracking"])
+
 
 if __name__ == "__main__":
     import uvicorn

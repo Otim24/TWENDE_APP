@@ -15,6 +15,7 @@ class Route(TimestampMixin, models.Model):
     origin = fields.CharField(max_length=100)
     destination = fields.CharField(max_length=100)
     stops = fields.JSONField(default=[]) # List of stops: [{"name": "Mukono", "time_offset": 30}, ...]
+    polyline = fields.TextField(null=True) # Encoded polyline string (OSRM/Google format)
     
     trips: fields.ReverseRelation["Trip"]
 

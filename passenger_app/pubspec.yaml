@@ -20,6 +20,8 @@ dependencies:
   gal: ^2.3.0
   permission_handler: ^11.3.0
   path_provider: ^2.1.2
+  maplibre_gl: ^0.25.0
+  web_socket_channel: ^3.0.0
 
 flutter:
   uses-material-design: true

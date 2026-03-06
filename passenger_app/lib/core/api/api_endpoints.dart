@@ -7,7 +7,7 @@ class ApiEndpoints {
   // This works for both Emulator and Physical Device (if adb reverse is run)
   static String get baseUrl {
     // LAN Connection (Same WiFi)
-    if (Platform.isAndroid) return "http://192.168.100.19:8000/api/v1";
+    if (Platform.isAndroid) return "http://192.168.1.6:8000/api/v1";
     return "http://127.0.0.1:8000/api/v1";
   }
 

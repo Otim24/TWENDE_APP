@@ -1,8 +1,9 @@
-
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 class BusDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> bus;
@@ -15,16 +16,14 @@ class BusDetailsScreen extends StatefulWidget {
 
 class _BusDetailsScreenState extends State<BusDetailsScreen> with SingleTickerProviderStateMixin {
   // Kampala Coordinates
-  static const CameraPosition _kKampala = CameraPosition(
-    target: LatLng(0.3476, 32.5825),
-    zoom: 12.0,
-  );
+  // Map & Tracking State
+  MaplibreMapController? _mapController;
+  WebSocketChannel? _channel;
+  final LatLng _center = const LatLng(0.3476, 32.5825); // Default: Kampala
 
-  late GoogleMapController _mapController;
+  // UI State
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  
-  // Real-time State
   late int _currentAvailableSeats;
 
   @override
@@ -45,11 +44,56 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> with SingleTickerPr
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+    
+    _connectWebSocket();
+  }
+
+  void _connectWebSocket() {
+    // 10.0.2.2 for Emulator accessing localhost
+    const wsUrl = 'ws://10.0.2.2:8000/api/v1/tracking'; 
+    final tripId = widget.bus['id'] ?? 1;
+    
+    try {
+      _channel = WebSocketChannel.connect(Uri.parse('$wsUrl/$tripId'));
+      
+      _channel!.stream.listen((message) {
+        final data = jsonDecode(message);
+        if (data['lat'] != null && data['lng'] != null) {
+          _updateBusLocation(LatLng(data['lat'], data['lng']));
+        }
+      });
+    } catch (e) {
+      debugPrint("WebSocket Error: $e");
+    }
+  }
+
+  void _onMapCreated(MaplibreMapController controller) async {
+    _mapController = controller;
+    // Add custom marker icon (using a simple circle or loading an asset)
+    // For MVP transparency, we'll try to load a known asset or just use a default circle if possible.
+    // Since we don't have a guaranteed bus asset loaded in the style, we'll try to add a CircleLayer instead for simplicity and reliability?
+    // actually, addImage is better if we have an asset. Let's assume we don't and just use a Symbol with a fallback or Circle.
+    // Changing to CircleLayer for maximum reliability without assets.
+  }
+
+  void _updateBusLocation(LatLng position) {
+    if (_mapController != null) {
+      _mapController!.clearCircles();
+      _mapController!.addCircle(CircleOptions(
+        geometry: position,
+        circleColor: "#FF0000",
+        circleRadius: 10,
+        circleStrokeWidth: 2,
+        circleStrokeColor: "#FFFFFF",
+      ));
+      _mapController!.animateCamera(CameraUpdate.newLatLng(position));
+    }
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
+    _channel?.sink.close();
     super.dispose();
   }
 
@@ -60,12 +104,19 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> with SingleTickerPr
       body: Stack(
         children: [
           // 1. Map Placeholder (Static Image - Google Style)
+          // 1. Live Tracking Map Preview (MapLibre Entry)
+          // 1. Embedded Map (MapLibre)
           SizedBox(
             height: MediaQuery.of(context).size.height * 0.6,
             width: double.infinity,
-            child: Image.asset(
-              'assets/images/map_placeholder.png',
-              fit: BoxFit.cover,
+            child: MaplibreMap(
+              initialCameraPosition: CameraPosition(target: _center, zoom: 12),
+              onMapCreated: _onMapCreated,
+              // Using Cartesian standard style (reliable for vector tiles)
+              // Or use a raster style if vector fails on device
+              styleString: "https://demotiles.maplibre.org/style.json",
+              myLocationEnabled: false, // Don't use user location for now
+              attributionButtonPosition: AttributionButtonPosition.topRight,
             ),
           ),
 
@@ -103,9 +154,9 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> with SingleTickerPr
 
           // 3. Draggable Scrollable Sheet (Details - Dark Theme)
           DraggableScrollableSheet(
-            initialChildSize: 0.60, // Increased to fit content without cutting off
-            minChildSize: 0.60,
-            maxChildSize: 0.75,     // Reduced further to keep map visible
+            initialChildSize: 0.40, // Start lower so map is visible
+            minChildSize: 0.20,     // Can be dragged down to see almost full map
+            maxChildSize: 0.60,     // Max height is ~60% of screen (halfway + bit more)
             builder: (context, scrollController) {
               return Container(
                 decoration: BoxDecoration(
