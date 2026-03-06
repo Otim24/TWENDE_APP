@@ -28,9 +28,9 @@ class _TrackingScreenState extends State<TrackingScreen> {
   
   void _connectWebSocket() {
     // In real app, use environmental config for IP
-    // Using 10.0.2.2 for Android Emulator to localhost, or 192.168.100.19 for device
+    // Using 10.0.2.2 for Android Emulator to localhost, or 172.20.37.30 for device
     // For now assuming Android Emulator loopback or explicit IP
-    const wsUrl = 'ws://192.168.100.19:8000/api/v1/tracking'; 
+    const wsUrl = 'ws://172.20.37.30:8000/api/v1/tracking'; 
     final tripId = widget.tripData['id'] ?? 1;
     
     try {

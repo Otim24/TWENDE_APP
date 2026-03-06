@@ -4,8 +4,39 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.api.deps import get_current_user
 from app.models import Trip, TripStatus, User
 from app.models.trip_model import Route
+from app.models.booking_model import Booking, BookingStatus
 
 router = APIRouter()
+
+@router.get("/my-trips")
+async def get_my_trips(current_user: User = Depends(get_current_user)):
+    """
+    Get all bookings for the authenticated user.
+    """
+    bookings = await Booking.filter(
+        user=current_user,
+        status__in=[BookingStatus.PAID, BookingStatus.USED] # only return paid or used tickets
+    ).prefetch_related("trip", "trip__route", "trip__bus").order_by("-trip__departure_time")
+
+    results = []
+    for booking in bookings:
+        results.append({
+            "id": booking.id,
+            "seat_number": booking.seat_number,
+            "status": booking.status.value,
+            "qr_code_data": booking.qr_code_data,
+            "trip": {
+                "id": booking.trip.id,
+                "origin": booking.trip.route.origin,
+                "destination": booking.trip.route.destination,
+                "departure_time": booking.trip.departure_time.isoformat() if booking.trip.departure_time else None,
+                "arrival_time": booking.trip.arrival_time.isoformat() if booking.trip.arrival_time else None,
+                "price": booking.trip.price,
+                "status": booking.trip.status.value,
+                "bus_plate": booking.trip.bus.plate_number,
+            }
+        })
+    return results
 
 @router.get("/search")
 async def search_trips(
