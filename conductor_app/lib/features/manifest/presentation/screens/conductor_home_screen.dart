@@ -26,8 +26,7 @@ class _ConductorHomeScreenState extends State<ConductorHomeScreen> {
   Map<String, dynamic>? _activeTrip; // Computed from manifest for now
 
   // LAN Connection
-  final String _baseUrl = 'http://192.168.100.19:8000/api/v1/conductor';
-
+final String _baseUrl = 'http://192.168.1.65:8000/api/v1/conductor';
   @override
   void initState() {
     super.initState();

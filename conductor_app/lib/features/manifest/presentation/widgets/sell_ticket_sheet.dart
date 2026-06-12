@@ -33,7 +33,7 @@ class _SellTicketSheetState extends State<SellTicketSheet> with SingleTickerProv
   List<int> _availableSeats = [];
   
   // LAN Url
-  final String _baseUrl = 'http://192.168.100.19:8000/api/v1/conductor';
+  final String _baseUrl = 'http://172.20.11.181:8000/api/v1/conductor';
 
   @override
   void initState() {

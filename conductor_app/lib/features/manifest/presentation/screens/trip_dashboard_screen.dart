@@ -26,7 +26,7 @@ class _TripDashboardScreenState extends State<TripDashboardScreen> {
   String? _error;
 
   // Assuming same LAN IP
-  final String _baseUrl = 'http://192.168.100.19:8000/api/v1/conductor';
+  final String _baseUrl = 'http://172.20.11.181:8000/api/v1/conductor';
 
   @override
   void initState() {

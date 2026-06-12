@@ -30,7 +30,7 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
   Timer? _feedbackTimer;
   
   // Using ADB Reverse Tunnel for reliability
-  final String _baseUrl = 'http://127.0.0.1:8000/api/v1'; 
+  final String _baseUrl = 'http://172.20.11.181:8000/api/v1'; 
 
   @override
   void initState() {

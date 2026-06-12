@@ -3,7 +3,9 @@ description: The passenger app for Twende.
 version: 1.0.0+1
 environment:
   sdk: ">=3.0.0 <4.0.0"
+
 dependencies:
+  sentry_flutter: ^9.21.0
   flutter:
     sdk: flutter
   flutter_riverpod: ^2.4.9
@@ -25,7 +27,11 @@ dependencies:
 
 flutter:
   uses-material-design: true
-
-
   assets:
     - assets/images/
+
+sentry:
+  upload_debug_symbols: true
+  upload_source_maps: true
+  project: twende-flutter
+  org: axeon-systems-security

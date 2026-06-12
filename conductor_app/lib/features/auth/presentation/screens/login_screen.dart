@@ -18,7 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _error;
   
   // LAN Connection (Firewall Unblocked)
-  final String _baseUrl = 'http://192.168.100.19:8000/api/v1/auth';
+  final String _baseUrl = 'http://192.168.1.65:8000/api/v1/auth';
 
   Future<void> _login() async {
     setState(() {

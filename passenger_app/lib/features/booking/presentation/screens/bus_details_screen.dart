@@ -49,8 +49,8 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> with SingleTickerPr
   }
 
   void _connectWebSocket() {
-    // 10.0.2.2 for Emulator accessing localhost
-    const wsUrl = 'ws://10.0.2.2:8000/api/v1/tracking'; 
+    // 192.168.1.65 for device on LAN
+    const wsUrl = 'ws://192.168.1.65:8000/api/v1/tracking'; 
     final tripId = widget.bus['id'] ?? 1;
     
     try {
