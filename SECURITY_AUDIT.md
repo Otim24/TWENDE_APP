@@ -41,7 +41,7 @@
   ```
 
 ### CRITICAL: Security Misconfiguration - Exposed Secrets (OWASP A05)
-- **Location**: `.env` and `docker-compose.yml`
+- ~~**Location**: `.env` and `docker-compose.yml`~~ ✅ Fixed
 - **Vulnerability**: The `.env` file containing `SECRET_KEY=change_this_secret_key` and Postgres database credentials is committed to Git.
 - **Danger**: Anyone with access to the repo can decrypt JWT tokens, forge admin sessions, and access the database.
 - **Fix**: Add `.env` to `.gitignore`. Generate a secure 32-byte key using `openssl rand -hex 32` and store it securely via CI/CD for production.
@@ -49,7 +49,7 @@
 ## Input Validation
 
 ### HIGH: Insecure OTP Generation
-- **Location**: `backend/app/api/v1/auth.py` (line 28)
+- ~~**Location**: `backend/app/api/v1/auth.py` (line 28)~~ ✅ Fixed
 - **Vulnerability**: `random.randint(100000, 999999)` is used for OTP generation. The standard `random` library is not cryptographically secure.
 - **Danger**: An attacker could potentially predict the sequence of random numbers and bypass OTP validation.
 - **Fix**: Use Python's `secrets` module which is designed for cryptography.
@@ -105,7 +105,7 @@
 ## Recommendations
 
 1. **Immediate Actions (Critical)**:
-   - Add `.env` to `.gitignore`.
+   - ~~Add `.env` to `.gitignore`.~~ ✅ Fixed
    - Add `Depends(get_current_user)` to all conductor endpoints and add RBAC to ensure the user is a `CONDUCTOR`.
    - Implement `bcrypt` password hashing using the existing `get_password_hash` in `security.py`.
 2. **Short Term (High)**:

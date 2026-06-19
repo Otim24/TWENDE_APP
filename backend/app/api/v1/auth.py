@@ -7,7 +7,7 @@ from app.models.wallet_model import Wallet
 from app.core.config import settings
 from app.services.notification import notification_service
 import redis.asyncio as redis
-import random
+import secrets
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -25,7 +25,7 @@ class OTPVerify(BaseModel):
 @router.post("/otp/request")
 async def request_otp(payload: OTPRequest):
     # 1. Generate 6-digit code
-    code = str(random.randint(100000, 999999))
+    code = str(secrets.randbelow(900000) + 100000)
     
     # 2. Store in Redis (TTL: 300s = 5 mins)
     await redis_client.setex(f"otp:{payload.phone}", 300, code)
