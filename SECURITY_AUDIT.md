@@ -61,7 +61,7 @@
 ## Data Exposure
 
 ### MEDIUM: Sensitive Data Exposure in Responses
-- **Location**: `backend/app/api/v1/users.py` (line 13)
+- ~~**Location**: `backend/app/api/v1/users.py` (line 13)~~ ✅ Fixed
 - **Vulnerability**: Returning internal database structures directly. Although the current `/me` endpoint maps specific fields, `id` and `phone` numbers are exposed.
 - **Danger**: Leaks internal Identifiers. 
 - **Fix**: Make sure to map schemas thoroughly and avoid sharing more PII than necessary.
@@ -69,7 +69,7 @@
 ## Transport Security
 
 ### HIGH: Cleartext Traffic Allowed
-- **Location**: Android Manifests (Passenger and Conductor apps)
+- ~~**Location**: Android Manifests (Passenger and Conductor apps)~~ ✅ Fixed
 - **Vulnerability**: `android:usesCleartextTraffic="true"` is enabled. All API calls default to HTTP instead of HTTPS. WebSocket connections might also be unencrypted.
 - **Danger**: Man-in-The-Middle (MITM) attackers can intercept JWT tokens, phone numbers, and OTP codes over public Wi-Fi.
 - **Fix**: Set `android:usesCleartextTraffic="false"` and ensure the backend uses an HTTPS proxy (like Nginx or Traefik) with a valid SSL/TLS certificate. Update any WS connections to use `wss://`.
@@ -77,7 +77,7 @@
 ## Mobile App Security
 
 ### HIGH: Insecure QR Code Ticketing
-- **Location**: `backend/app/api/v1/conductor.py` (line 94)
+- ~~**Location**: `backend/app/api/v1/conductor.py` (line 94)~~ ✅ Fixed
 - **Vulnerability**: `qr_code_data=f"TICKET-{trip.id}-{payload.seat_number}"`. The QR code contains easily guessable plain text data.
 - **Danger**: A malicious passenger can generate their own QR code by incrementing seat numbers and bypass the payment system entirely.
 - **Fix**: Generate an HMAC signature for the QR code payload.
@@ -91,13 +91,13 @@
 ## Business Logic Vulnerabilities
 
 ### HIGH: Race Condition in Booking
-- **Location**: `backend/app/api/v1/conductor.py` (line 68)
+- ~~**Location**: `backend/app/api/v1/conductor.py` (line 68)~~ ✅ Fixed
 - **Vulnerability**: The `sell_ticket` endpoint checks for existing seats with `await Booking.filter(...).exists()`, and then later creates the booking.
 - **Danger**: Two concurrent requests for the exact same seat will both pass the `.exists()` check and proceed to create duplicate bookings.
 - **Fix**: The Tortoise model has a `unique_together` constraint, but proper error handling must be implemented to catch the `IntegrityError` when duplicates occur.
 
 ### MEDIUM: Past Trip Ticketing
-- **Location**: `backend/app/api/v1/conductor.py` (line 60)
+- ~~**Location**: `backend/app/api/v1/conductor.py` (line 60)~~ ✅ Fixed
 - **Vulnerability**: A conductor can call `sell_ticket` with a `trip_id` that occurred in the past.
 - **Danger**: Can skew financial records and manifest accuracy.
 - **Fix**: Check `if trip.departure_time < datetime.now(timezone.utc): raise HTTPException(...)`

@@ -1,6 +1,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:twende_passenger_app/core/widgets/glass_container.dart';
 
 class AccountScreen extends StatelessWidget {
@@ -70,8 +72,12 @@ class AccountScreen extends StatelessWidget {
 
             // Logout Button
             GestureDetector(
-              onTap: () {
-                // TODO: Logout logic
+              onTap: () async {
+                const storage = FlutterSecureStorage();
+                await storage.delete(key: 'auth_token');
+                if (context.mounted) {
+                  context.go('/login');
+                }
               },
               child: GlassContainer(
                 width: double.infinity,

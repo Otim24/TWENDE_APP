@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,8 +12,10 @@ import 'package:twende_passenger_app/features/wallet/presentation/screens/deposi
 import 'package:twende_passenger_app/features/auth/presentation/screens/splash_screen.dart';
 import 'package:twende_passenger_app/features/payment/presentation/screens/payment_screen.dart';
 import 'package:twende_passenger_app/features/booking/presentation/screens/ticket_receipt_screen.dart';
-import 'package:twende_passenger_app/features/wallet/presentation/screens/wallet_dashboard_screen.dart';import 'package:sentry_flutter/sentry_flutter.dart';
-
+import 'package:twende_passenger_app/features/wallet/presentation/screens/wallet_dashboard_screen.dart';
+import 'package:twende_passenger_app/features/account/presentation/screens/account_screen.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 Future<void> main() async {
   await dotenv.load(fileName: ".env");
@@ -122,7 +123,7 @@ final _router = GoRouter(
     // Add more routes here
     GoRoute(
       path: '/profile',
-      builder: (context, state) => const Scaffold(body: Center(child: Text("Profile Settings"))),
+      builder: (context, state) => const AccountScreen(),
     ),
   ],
 );

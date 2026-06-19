@@ -29,7 +29,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
   
   void _connectWebSocket() {
     // Using dotenv for environmental config
-    final wsUrl = dotenv.env['WS_URL'] ?? 'ws://127.0.0.1:8000/api/v1/tracking'; 
+    final wsUrl = dotenv.env['WS_URL'] ?? 'wss://127.0.0.1:8000/api/v1/tracking'; 
     final tripId = widget.tripData['id'] ?? 1;
     
     try {

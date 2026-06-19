@@ -67,11 +67,18 @@ async def sell_ticket(payload: SellTicketRequest, current_user: User = Depends(g
         raise HTTPException(status_code=403, detail="Not authorized")
     from tortoise.transactions import in_transaction
     from app.models.wallet_model import Wallet, Transaction, TransactionType, TransactionStatus
+    from tortoise.exceptions import IntegrityError
+    import hmac, hashlib
+    from app.core.config import settings
 
     # 1. Check Trip
     trip = await Trip.get_or_none(id=payload.trip_id)
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found")
+
+    from datetime import datetime, timezone
+    if trip.departure_time < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Cannot sell tickets for a past trip")
 
     # 2. Check Seat Availability
     existing = await Booking.filter(trip=trip, seat_number=payload.seat_number).exists()
@@ -133,13 +140,20 @@ async def sell_ticket(payload: SellTicketRequest, current_user: User = Depends(g
             raise HTTPException(status_code=400, detail=f"Unsupported payment method: {payload.payment_method}")
 
         # 5. Create Booking (only reached if payment logic above passed)
-        booking = await Booking.create(
-            trip=trip,
-            user=user,
-            seat_number=payload.seat_number,
-            status=BookingStatus.PAID,
-            qr_code_data=f"TICKET-{trip.id}-{payload.seat_number}"
-        )
+        raw_payload = f"TICKET-{trip.id}-{payload.seat_number}"
+        signature = hmac.new(settings.SECRET_KEY.encode(), raw_payload.encode(), hashlib.sha256).hexdigest()
+        qr_code_data = f"{raw_payload}:{signature}"
+        
+        try:
+            booking = await Booking.create(
+                trip=trip,
+                user=user,
+                seat_number=payload.seat_number,
+                status=BookingStatus.PAID,
+                qr_code_data=qr_code_data
+            )
+        except IntegrityError:
+            raise HTTPException(status_code=400, detail=f"Seat {payload.seat_number} was just taken by another transaction")
 
     return {
         "success": True, 

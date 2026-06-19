@@ -7,6 +7,7 @@ from app.models.wallet_model import Wallet
 from app.core.config import settings
 from app.services.notification import notification_service
 import redis.asyncio as redis
+from redis.exceptions import RedisError
 import secrets
 from pydantic import BaseModel
 
@@ -28,7 +29,13 @@ async def request_otp(payload: OTPRequest):
     code = str(secrets.randbelow(900000) + 100000)
     
     # 2. Store in Redis (TTL: 300s = 5 mins)
-    await redis_client.setex(f"otp:{payload.phone}", 300, code)
+    try:
+        await redis_client.setex(f"otp:{payload.phone}", 300, code)
+    except RedisError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service temporarily unavailable. Please try again later."
+        )
     
     # 3. Send SMS
     await notification_service.send_sms(payload.phone, code)
@@ -38,7 +45,13 @@ async def request_otp(payload: OTPRequest):
 @router.post("/otp/verify", response_model=Token)
 async def verify_otp(payload: OTPVerify):
     # 1. Verify Code
-    stored_code = await redis_client.get(f"otp:{payload.phone}")
+    try:
+        stored_code = await redis_client.get(f"otp:{payload.phone}")
+    except RedisError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service temporarily unavailable. Please try again later."
+        )
     
     if not stored_code or stored_code != payload.code:
         raise HTTPException(
@@ -70,7 +83,10 @@ async def verify_otp(payload: OTPVerify):
     )
     
     # 4. Clean up OTP
-    await redis_client.delete(f"otp:{payload.phone}")
+    try:
+        await redis_client.delete(f"otp:{payload.phone}")
+    except RedisError:
+        pass # Not critical if cleanup fails
     
     return {"access_token": access_token, "token_type": "bearer"}
 

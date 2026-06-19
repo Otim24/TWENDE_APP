@@ -30,11 +30,11 @@
 - ~~**Missing Sentry Initialisation Cleanup**: Both `passenger_app/lib/main.dart` (line 37) and `conductor_app/lib/main.dart` (line 20) contain `await Sentry.captureException(Exception('This is a sample exception.'));`. This will send a false error to Sentry on every app launch. Fix: Remove these lines.~~ ✅ Fixed
 
 ### MEDIUM
-- **Empty Routes in App**: `passenger_app/lib/main.dart` has an empty implementation for `/profile` using a basic `Scaffold` placeholder.
+- ~~**Empty Routes in App**: `passenger_app/lib/main.dart` has an empty implementation for `/profile` using a basic `Scaffold` placeholder.~~ ✅ Fixed
 - **TODO Debt**: Various `TODO`s exist throughout the app:
   - `deposit_screen.dart` line 90: Payment Logic missing.
   - `otp_screen.dart` line 128: Resend OTP missing.
-  - `account_screen.dart` line 74: Logout logic missing.
+  - ~~`account_screen.dart` line 74: Logout logic missing.~~ ✅ Fixed
   - `CMakeLists.txt` and `build.gradle` files mention updating application IDs and signing configs.
 
 ### LOW
@@ -43,8 +43,8 @@
 ## Infrastructure Issues
 
 ### CRITICAL
-- **Production Secrets in Source Code**: The `.env` file contains `SECRET_KEY=change_this_secret_key` and is committed to the repository because `.gitignore` only ignores `data/`. Fix: Add `.env` to `.gitignore` and rotate the `SECRET_KEY` immediately.
+- ~~**Production Secrets in Source Code**: The `.env` file contains `SECRET_KEY=change_this_secret_key` and is committed to the repository because `.gitignore` only ignores `data/`. Fix: Add `.env` to `.gitignore` and rotate the `SECRET_KEY` immediately.~~ ✅ Fixed
 
 ### MEDIUM
-- **Migration Debt**: The presence of `fix_db.py`, `fix_schema.py`, and `fix_schema_remaining.py` indicates a broken migration strategy. `fix_schema.py` adds a `status` column to `trips` manually. Fix: Adopt `aerich` (already in `pyproject.toml`) for a structured migration system and remove these scripts.
-- **No Redis Error Handling**: `backend/app/api/v1/auth.py` connects to Redis but does not handle connection dropouts gracefully. If Redis fails, OTP requests will crash with a 500 error.
+- ~~**Migration Debt**: The presence of `fix_db.py`, `fix_schema.py`, and `fix_schema_remaining.py` indicates a broken migration strategy. `fix_schema.py` adds a `status` column to `trips` manually. Fix: Adopt `aerich` (already in `pyproject.toml`) for a structured migration system and remove these scripts.~~ ✅ Fixed
+- ~~**No Redis Error Handling**: `backend/app/api/v1/auth.py` connects to Redis but does not handle connection dropouts gracefully. If Redis fails, OTP requests will crash with a 500 error.~~ ✅ Fixed
