@@ -17,6 +17,7 @@ import 'package:twende_passenger_app/features/wallet/presentation/screens/wallet
 
 
 Future<void> main() async {
+  await dotenv.load(fileName: ".env");
   await SentryFlutter.init(
     (options) {
       options.dsn = 'https://6aa30fe8a75ef59b37d0a3c8f33c180c@o4511531098832896.ingest.us.sentry.io/4511531149950976';
@@ -33,8 +34,6 @@ Future<void> main() async {
     ),
   )),
   );
-  // TODO: Remove this line after sending the first sample event to sentry.
-  await Sentry.captureException(Exception('This is a sample exception.'));
 }
 
 // Router Configuration

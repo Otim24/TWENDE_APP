@@ -1,6 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from app.models.booking_model import Booking, BookingStatus
 from app.models.trip_model import Trip, TripStatus
+from app.models.user_model import User, UserRole
+from app.api.deps import get_current_user
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -14,7 +16,9 @@ class TicketVerifyResponse(BaseModel):
     booking_details: dict | None = None
 
 @router.post("/verify_ticket", response_model=TicketVerifyResponse)
-async def verify_ticket(request: TicketVerifyRequest):
+async def verify_ticket(request: TicketVerifyRequest, current_user: User = Depends(get_current_user)):
+    if current_user.role != UserRole.CONDUCTOR:
+        raise HTTPException(status_code=403, detail="Not authorized")
     booking_id_str = request.ticket_data
     
     # Basic parsing if needed. For now assuming ticket_data Is the ID.
@@ -58,7 +62,12 @@ class SellTicketRequest(BaseModel):
     payment_method: str # CASH, MOMO
 
 @router.post("/sell_ticket")
-async def sell_ticket(payload: SellTicketRequest):
+async def sell_ticket(payload: SellTicketRequest, current_user: User = Depends(get_current_user)):
+    if current_user.role != UserRole.CONDUCTOR:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    from tortoise.transactions import in_transaction
+    from app.models.wallet_model import Wallet, Transaction, TransactionType, TransactionStatus
+
     # 1. Check Trip
     trip = await Trip.get_or_none(id=payload.trip_id)
     if not trip:
@@ -70,9 +79,6 @@ async def sell_ticket(payload: SellTicketRequest):
         raise HTTPException(status_code=400, detail=f"Seat {payload.seat_number} is already taken")
 
     # 3. Find or Create User (Walk-in)
-    from app.models.user_model import User, UserRole
-    from app.models.wallet_model import Wallet
-    
     user = await User.get_or_none(phone=payload.passenger_phone)
     if not user:
         # Create Walk-in User
@@ -83,21 +89,63 @@ async def sell_ticket(payload: SellTicketRequest):
             password_hash="" # Walk-in doesn't have password yet
         )
         await Wallet.create(user=user)
-    
-    # 4. Create Booking
-    # For MVP, assuming payment was successful locally (Cash/MoMo)
-    booking = await Booking.create(
-        trip=trip,
-        user=user,
-        seat_number=payload.seat_number,
-        status=BookingStatus.PAID, # Auto-mark as PAID
-        qr_code_data=f"TICKET-{trip.id}-{payload.seat_number}" # Simple QR logic
-    )
+
+    # 4. Process Payment & Create Booking inside a transaction
+    async with in_transaction():
+        ticket_price = trip.price  # DecimalField from the Trip model
+
+        if payload.payment_method == "MOMO":
+            # For MOMO, deduct from wallet balance
+            wallet = await Wallet.get_or_none(user=user)
+            if not wallet:
+                raise HTTPException(status_code=400, detail="Wallet not found for this user")
+            if wallet.balance < ticket_price:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Insufficient wallet balance. Required: {ticket_price}, Available: {wallet.balance}"
+                )
+
+            wallet.balance -= ticket_price
+            await wallet.save()
+
+            # Record the deduction transaction
+            await Transaction.create(
+                wallet=wallet,
+                amount=ticket_price,
+                type=TransactionType.PAYMENT,
+                status=TransactionStatus.COMPLETED,
+                reference=f"TICKET-{trip.id}-{payload.seat_number}"
+            )
+
+        elif payload.payment_method == "CASH":
+            # Cash is collected physically by the conductor.
+            # Record a transaction for audit trail only.
+            wallet = await Wallet.get_or_none(user=user)
+            if wallet:
+                await Transaction.create(
+                    wallet=wallet,
+                    amount=ticket_price,
+                    type=TransactionType.PAYMENT,
+                    status=TransactionStatus.COMPLETED,
+                    reference=f"CASH-{trip.id}-{payload.seat_number}"
+                )
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported payment method: {payload.payment_method}")
+
+        # 5. Create Booking (only reached if payment logic above passed)
+        booking = await Booking.create(
+            trip=trip,
+            user=user,
+            seat_number=payload.seat_number,
+            status=BookingStatus.PAID,
+            qr_code_data=f"TICKET-{trip.id}-{payload.seat_number}"
+        )
 
     return {
         "success": True, 
         "booking_id": booking.id, 
-        "message": f"Ticket Sold! Seat {payload.seat_number} Assigned."
+        "message": f"Ticket Sold! Seat {payload.seat_number} Assigned.",
+        "payment_method": payload.payment_method
     }
 
 
@@ -111,17 +159,14 @@ class TripResponse(BaseModel):
     total_seats: int
 
 @router.get("/trips", response_model=list[TripResponse])
-async def get_trips():
+async def get_trips(current_user: User = Depends(get_current_user)):
+    if current_user.role != UserRole.CONDUCTOR:
+        raise HTTPException(status_code=403, detail="Not authorized")
     # In real app, filter by conductor assignment. 
     # For MVP, returning all SCHEDULED or BOARDING trips.
-    # Remove prefetch to avoid "route_id does not exist" if DB schema is out of sync
     trips = await Trip.filter(
         status__in=[TripStatus.SCHEDULED, TripStatus.BOARDING]
-    ).all()
-    
-    # Manually fetch to be safe
-    for t in trips:
-        await t.fetch_related("bus", "route", "bookings")
+    ).prefetch_related("bus", "route", "bookings").all()
     
     response = []
     for trip in trips:
@@ -172,7 +217,9 @@ class ManifestItem(BaseModel):
     booking_id: int | None = None
 
 @router.get("/trips/{trip_id}/manifest", response_model=list[ManifestItem])
-async def get_trip_manifest(trip_id: int):
+async def get_trip_manifest(trip_id: int, current_user: User = Depends(get_current_user)):
+    if current_user.role != UserRole.CONDUCTOR:
+        raise HTTPException(status_code=403, detail="Not authorized")
     trip = await Trip.get_or_none(id=trip_id).prefetch_related("bus")
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found")

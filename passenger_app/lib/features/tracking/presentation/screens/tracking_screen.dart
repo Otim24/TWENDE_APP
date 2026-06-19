@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class TrackingScreen extends StatefulWidget {
   final Map<String, dynamic> tripData;
@@ -27,9 +28,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
   }
   
   void _connectWebSocket() {
-    // In real app, use environmental config for IP
-    // Using 192.168.1.65 for device on LAN
-    const wsUrl = 'ws://192.168.1.65:8000/api/v1/tracking'; 
+    // Using dotenv for environmental config
+    final wsUrl = dotenv.env['WS_URL'] ?? 'ws://127.0.0.1:8000/api/v1/tracking'; 
     final tripId = widget.tripData['id'] ?? 1;
     
     try {

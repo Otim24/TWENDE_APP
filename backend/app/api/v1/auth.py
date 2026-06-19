@@ -1,7 +1,7 @@
 
 from fastapi import APIRouter, HTTPException, Depends, status
 from app.schemas.auth_schema import Token
-from app.core.security import create_access_token
+from app.core.security import create_access_token, verify_password
 from app.models.user_model import User, UserRole
 from app.models.wallet_model import Wallet
 from app.core.config import settings
@@ -73,7 +73,6 @@ async def verify_otp(payload: OTPVerify):
     await redis_client.delete(f"otp:{payload.phone}")
     
     return {"access_token": access_token, "token_type": "bearer"}
-    return {"access_token": access_token, "token_type": "bearer"}
 
 class LoginRequest(BaseModel):
     phone: str
@@ -91,9 +90,7 @@ async def login(payload: LoginRequest):
     if not user:
          raise HTTPException(status_code=400, detail="Invalid credentials")
 
-    # TODO: Use proper hashing (bcrypt)
-    # For now, simplistic check: if user.password_hash == payload.password
-    if user.password_hash != payload.password:
+    if not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=400, detail="Invalid credentials")
 
     access_token = create_access_token(

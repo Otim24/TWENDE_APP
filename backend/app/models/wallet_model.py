@@ -6,6 +6,8 @@ class Wallet(TimestampMixin, models.Model):
     id = fields.IntField(pk=True)
     user = fields.OneToOneField("models.User", related_name="wallet")
     balance = fields.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    currency = fields.CharField(max_length=3, default="UGX")
+    status = fields.CharField(max_length=8, default="ACTIVE")
 
     class Meta:
         table = "wallets"

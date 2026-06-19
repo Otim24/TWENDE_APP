@@ -11,7 +11,7 @@
 ## Authentication & Authorization
 
 ### CRITICAL: Broken Access Control (OWASP A01)
-- **Location**: `backend/app/api/v1/conductor.py` (lines 16, 60, 113, 174)
+- ~~**Location**: `backend/app/api/v1/conductor.py` (lines 16, 60, 113, 174)~~ ✅ Fixed
 - **Vulnerability**: Endpoints like `/verify_ticket`, `/sell_ticket`, `/trips`, and `/trips/{trip_id}/manifest` completely lack the JWT token dependency (`Depends(get_current_user)`). There is also no RBAC checking if the user is genuinely a `CONDUCTOR`.
 - **Danger**: Any unauthenticated user over the internet can hit these endpoints to generate free tickets, view passenger manifests, and mark tickets as used.
 - **Fix**: Add authentication and role-based access control to these endpoints:
@@ -27,7 +27,7 @@
   ```
 
 ### CRITICAL: Cryptographic Failures - Plain Text Passwords (OWASP A02)
-- **Location**: `backend/app/api/v1/auth.py` (lines 95-97)
+- ~~**Location**: `backend/app/api/v1/auth.py` (lines 95-97)~~ ✅ Fixed
 - **Vulnerability**: Passwords are saved and verified directly without hashing (`if user.password_hash != payload.password:`).
 - **Danger**: If the database is compromised, all user passwords are exposed instantly.
 - **Fix**: Implement `passlib` for bcrypt hashing (already in `security.py`).
