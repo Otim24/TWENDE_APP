@@ -19,15 +19,25 @@ class TicketVerifyResponse(BaseModel):
 async def verify_ticket(request: TicketVerifyRequest, current_user: User = Depends(get_current_user)):
     if current_user.role != UserRole.CONDUCTOR:
         raise HTTPException(status_code=403, detail="Not authorized")
-    booking_id_str = request.ticket_data
+    ticket_data = request.ticket_data
     
-    # Basic parsing if needed. For now assuming ticket_data Is the ID.
     try:
-        booking_id = int(booking_id_str)
+        raw_payload, signature = ticket_data.split(":")
+        parts = raw_payload.split("-")
+        if len(parts) != 3 or parts[0] != "TICKET":
+            raise ValueError()
+        trip_id = int(parts[1])
+        seat_number = int(parts[2])
     except ValueError:
-        return TicketVerifyResponse(valid=False, message="INVALID FORMAT: Ticket ID must be a number")
+        return TicketVerifyResponse(valid=False, message="INVALID FORMAT: Invalid ticket data")
 
-    booking = await Booking.get_or_none(id=booking_id).prefetch_related("user", "trip")
+    import hmac, hashlib
+    from app.core.config import settings
+    expected_signature = hmac.new(settings.SECRET_KEY.encode(), raw_payload.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected_signature, signature):
+        return TicketVerifyResponse(valid=False, message="INVALID SIGNATURE: Ticket may be forged")
+
+    booking = await Booking.get_or_none(trip_id=trip_id, seat_number=seat_number).prefetch_related("user", "trip")
     
     if not booking:
         return TicketVerifyResponse(valid=False, message="INVALID TICKET: Not Found")
@@ -244,9 +254,13 @@ async def get_trip_manifest(trip_id: int, current_user: User = Depends(get_curre
     booking_map = {b.seat_number: b for b in bookings}
     
     total_seats = trip.bus.total_seats if trip.bus else 60
+    seat_layout = getattr(trip.bus, "seat_layout", None) if trip.bus else None
+    
+    seats_to_map = seat_layout if seat_layout else list(range(1, total_seats + 1))
+    
     manifest = []
     
-    for i in range(1, total_seats + 1):
+    for i in seats_to_map:
         booking = booking_map.get(i)
         
         item_status = "AVAILABLE"

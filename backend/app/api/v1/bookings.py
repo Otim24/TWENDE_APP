@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.api.deps import get_current_user
@@ -58,13 +58,16 @@ async def search_trips(
     trips = await Trip.filter(
         route__origin__iexact=from_loc,
         route__destination__iexact=to_loc,
-        departure_time__gte=datetime.combine(search_date, datetime.min.time()),
-        departure_time__lte=datetime.combine(search_date, datetime.max.time()),
+        departure_time__gte=datetime.combine(search_date, datetime.min.time()).replace(tzinfo=timezone.utc),
+        departure_time__lte=datetime.combine(search_date, datetime.max.time()).replace(tzinfo=timezone.utc),
         status=TripStatus.SCHEDULED
-    ).prefetch_related("route", "bus")
+    ).prefetch_related("route", "bus", "bookings")
     
     results = []
     for trip in trips:
+        active_bookings_count = len([b for b in trip.bookings if b.status in [BookingStatus.PAID, BookingStatus.USED, BookingStatus.LOCKED]])
+        available_seats = trip.bus.total_seats - active_bookings_count
+        
         results.append({
             "id": trip.id,
             "origin": trip.route.origin,
@@ -74,7 +77,7 @@ async def search_trips(
             "price": trip.price,
             "bus_plate": trip.bus.plate_number,
             "total_seats": trip.bus.total_seats,
-            # "available_seats": Calculate from bookings count (todo)
+            "available_seats": available_seats
         })
     
     return results

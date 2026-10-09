@@ -1,109 +1,96 @@
-# TWENDE Project Overview
+# TWENDE Project Overview (In-Depth Audit)
 
-## Summary Table
+## Executive Summary
 
-| Category | Status |
-|---|---|
-| Architecture Components | 4 |
-| API Endpoints | 12 |
-| Database Models | 6 |
+TWENDE is a comprehensive transport ecosystem platform designed to streamline ticket booking, passenger management, and payment handling for public transit. The system relies on a central Python backend offering REST APIs to two distinct mobile applications built with Flutter: one for Passengers and one for Conductors. An Admin Dashboard is also planned but remains an empty skeleton at present.
 
-## Architecture
+---
 
-### Components
-- **Backend**: FastAPI (Python 3.11). Provides REST API, JWT auth, Tortoise ORM for database models, Redis for OTP caching, and PostgreSQL for persistence. Status: ~60% Done.
-- **Passenger App**: Flutter (Dart). Passenger-facing mobile app for ticket booking, wallet deposits, and viewing trips. Status: ~50% Done.
-- **Conductor App**: Flutter (Dart). Conductor-facing mobile app for ticket verification, walk-in sales, and manifest viewing. Status: ~40% Done.
-- **Admin Dashboard**: Referenced, but no source code directory or implementation details currently present in the repository beyond an empty folder structure. Status: 0% Done.
+## 1. System Architecture & Components
 
-### Backend API Endpoints (`backend/app/api/v1/`)
-| Route | Method | Purpose | Authenticated? |
-|---|---|---|---|
-| `/otp/request` | POST | Request a 6-digit OTP via SMS | No |
-| `/otp/verify` | POST | Verify OTP and register/login user, return JWT | No |
-| `/login` | POST | Login with phone & plain text password | No |
-| `/verify_ticket` | POST | Verify and consume QR ticket | No (Security Flaw) |
-| `/sell_ticket` | POST | Sell a ticket to a walk-in passenger | No (Security Flaw) |
-| `/trips` | GET | List available trips for conductors | No (Security Flaw) |
-| `/trips/{id}/manifest` | GET | Get passenger manifest for a specific trip | No (Security Flaw) |
-| `/my-trips` | GET | List current user's trips | Yes |
-| `/search` | GET | Search for trips by origin, destination, and date | No |
-| `/{trip_id}` | GET | Get detailed trip info | No |
-| `/me` | GET | Get current logged-in user profile | Yes |
-| `/balance` | GET | Get current user's wallet balance | Yes |
+The architecture is split into four primary components:
 
-### Database Schema (Tortoise ORM)
-- **User**: Stores phone, password_hash, full_name, and role (PASSENGER, CONDUCTOR, ADMIN).
-- **Wallet**: 1-to-1 with User. Stores balance, currency, and status.
-- **Route**: Stores name, origin, destination, JSON stops, and polyline.
-- **Bus**: Stores plate_number and total_seats.
-- **Trip**: Relates to Route and Bus. Stores departure_time, arrival_time, price, and status.
-- **Booking**: Links User and Trip. Stores seat_number, status (LOCKED, PAID, CANCELLED, USED), and qr_code_data. Unique on `(trip_id, seat_number)`.
+### A. Backend (`/backend`)
+A high-performance RESTful API powering the core logic of the Twende ecosystem.
+- **Framework:** Python 3.11 with FastAPI.
+- **ASGI Server:** Uvicorn.
+- **Database:** PostgreSQL (v15-alpine), managed via Tortoise ORM (`tortoise-orm`) and asynchronous asyncpg driver. Migrations are planned via `aerich`.
+- **Caching & Ephemeral Data:** Redis (v7-alpine), utilized currently for storing One-Time Passwords (OTPs) with a 5-minute Time-To-Live (TTL).
+- **Authentication:** JSON Web Tokens (JWT) using `python-jose` and password hashing handled by `passlib` (bcrypt).
 
-### Flutter Navigation Routes
-**Passenger App (`passenger_app/lib/main.dart`)**:
-- `/` -> Redirects to `/login`
-- `/login` -> `LoginScreen`
-- `/otp` -> `OtpScreen`
-- `/splash` -> `SplashScreen`
-- `/home` -> `HomeWrapper`
-- `/wallet` -> `WalletDashboardScreen`
-- `/wallet/deposit` -> `DepositScreen`
-- `/search_results` -> `SearchResultsScreen`
-- `/bus_details` -> `BusDetailsScreen`
-- `/seat_selection` -> `SeatSelectionScreen`
-- `/payment` -> `PaymentScreen`
-- `/receipt` -> `TicketReceiptScreen`
-- `/profile` -> Placeholder Scaffold
+### B. Passenger App (`/passenger_app`)
+A Flutter application (Dart SDK >=3.0.0) aimed at end-users booking bus tickets.
+- **Navigation:** Deeply integrated with `go_router`, allowing scalable path-based navigation (`/login`, `/home`, `/wallet/deposit`, `/search_results`, etc.).
+- **State Management:** Uses `flutter_riverpod` for responsive global state handling.
+- **Networking:** HTTP requests are made via `dio`.
+- **Mapping:** Integrated with `google_maps_flutter` and `maplibre_gl` for routing and visual bus tracking.
+- **Security:** `flutter_secure_storage` is configured for secure local storage of JWT tokens.
+- **Monitoring:** `sentry_flutter` handles crash reporting.
 
-**Conductor App (`conductor_app/lib/main.dart`)**:
-- Starts at `LoginScreen` (Direct widget reference, no GoRouter implemented yet).
+### C. Conductor App (`/conductor_app`)
+A Flutter application built for bus conductors to manage passenger manifests and walk-in ticket sales.
+- **Navigation:** Basic direct widget routing (`MaterialApp` default routing), presenting significant technical debt compared to the passenger app's `go_router` implementation.
+- **Features:** Integrates `mobile_scanner` to read QR tickets generated by the passenger app.
+- **Monitoring:** Also uses `sentry_flutter`.
 
-## Current Feature Status
+### D. Admin Dashboard (`/admin_dashboard`)
+Currently a stubbed out React v18 project (`package.json` initialized) with no source code implementation.
 
-### WORKING
-- Database schema generation via manual SQL scripts (`fix_db.py`).
-- OTP request and verification (though OTP is randomly generated locally and SMS is stubbed).
-- Wallet creation alongside new passenger registration.
-- Search Trips endpoint (backend functionality exists).
+---
 
-### STUBBED
-- Password checking (currently uses plain text `password == password_hash`).
-- `/sell_ticket` (assumes payment succeeded locally without hitting payment provider).
-- Profile Screen in passenger app (UI just shows a text placeholder).
+## 2. Data Flow & Lifecycles
 
-### MISSING
-- Admin Dashboard implementation.
-- Conductor authentication/routing (app just uses direct navigation).
-- Ticket seat locking (race condition exists where two users can lock a seat simultaneously).
+### Authentication & Registration Flow
+1. **Request:** Passenger submits phone number via `/otp/request`.
+2. **Backend:** FastAPI generates a 6-digit cryptographic secret and stores it in Redis (`otp:{phone}`) for 300 seconds. A mock SMS notification is sent.
+3. **Verification:** Passenger submits OTP via `/otp/verify`.
+4. **Processing:** The backend verifies against Redis. If the user does not exist, an atomic database transaction generates a `User` (Role: PASSENGER) and simultaneously provisions a `Wallet`. A JWT token is then returned to the client.
 
-### Hardcoded Values
-- IPs: `192.168.100.19` (in `ip_info.txt`), `127.0.0.1` (in `api_endpoints.dart`).
-- Passwords: OTP is hardcoded as randomly generated, and `auth.py` indicates passwords might just be stored as "1234" in seeds.
+### Ticket Booking Lifecycle
+1. **Search:** Passenger uses the `/search` endpoint to query trips based on origin, destination, and date.
+2. **Booking/Sales (Conductor Walk-in):** Conductor hits `/sell_ticket`. The backend verifies the `Trip` isn't in the past, and that the requested `seat_number` isn't taken.
+3. **Transaction:** The backend attempts to deduct the ticket `price` from the User's `Wallet`. If successful, it creates a `Transaction` log and locks the `Booking` into a `PAID` state within a unified SQL transaction.
+4. **QR Generation:** An HMAC signed payload (`TICKET-{trip_id}-{seat_number}:{signature}`) is generated to prevent offline forgery.
 
-## Dependencies
+### Manifest and Boarding Flow
+1. **Manifest Retrieval:** Conductors fetch the current bus manifest via `/trips/{trip_id}/manifest`, mapping bookings 1-to-1 against bus seat capacity.
+2. **Ticket Verification:** Conductors scan passenger QR codes. The `verify_ticket` endpoint verifies the payload validity, ensures the booking is `PAID`, marks it as `USED`, and allows the passenger aboard.
 
-### Backend (`pyproject.toml`)
-- `fastapi`, `uvicorn`: API framework.
-- `tortoise-orm`, `asyncpg`: Async database ORM and driver.
-- `redis`: Redis client for OTP caching.
-- `passlib`, `python-jose`: Password hashing (unused) and JWT token generation.
-- `aerich`: Migration tool.
+---
 
-### Dart/Flutter (`pubspec.yaml`)
-**Passenger App**:
-- `sentry_flutter`: Crash reporting (has hardcoded DSN).
-- `flutter_riverpod`: State management.
-- `go_router`: Navigation.
-- `dio`: HTTP client.
-- `flutter_secure_storage`: Secure token storage.
-- `google_maps_flutter`, `maplibre_gl`: Maps.
+## 3. Database Schema Mapping
 
-**Conductor App**:
-- Similar state/navigation/networking packages.
-- `mobile_scanner`: For scanning ticket QR codes.
+Built on Tortoise ORM, the current schema features heavy relational mapping:
 
-## Infrastructure
+- **Users (`users` table):**
+  - Identifiers: `phone` (Unique).
+  - Enums: `UserRole` (PASSENGER, CONDUCTOR, ADMIN).
+  - Relationships: Has one `Wallet`, Has many `Bookings`.
 
-- **Docker Compose**: Uses `postgres:15-alpine` (db), `redis:7-alpine` (redis), and `backend` (uvicorn API on port 8000). Volumes exist for Postgres data.
-- **Environment Variables**: Requires `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `SECRET_KEY`. The `.env` file exists and has `SECRET_KEY=change_this_secret_key` which is insecure.
+- **Wallets & Transactions (`wallets`, `transactions` tables):**
+  - Structure: Wallets hold a `balance` and `currency`. Transactions log atomic `DEPOSIT`, `WITHDRAWAL`, `PAYMENT`, and `REFUND` events against wallets.
+
+- **Routing & Trips (`routes`, `trips`, `buses` tables):**
+  - Route: Stores `origin`, `destination`, JSON `stops` mapping, and polyline coordinates.
+  - Bus: Stores `plate_number` and `total_seats`.
+  - Trip: The physical occurrence tying a `Route` and `Bus` to a specific `departure_time` and `price`. Tracks status via `TripStatus` enum.
+
+- **Bookings (`bookings` table):**
+  - Compound Uniqueness: Enforces uniqueness constraints on `(trip_id, seat_number)` to prevent double booking.
+  - State Machine: `LOCKED` -> `PAID` -> `USED` (or `CANCELLED`).
+  
+---
+
+## 4. Infrastructure & Deployment
+
+- **Docker:** The ecosystem is containerized utilizing `docker-compose`. The architecture boots a `postgres:15-alpine` container, a `redis:7-alpine` container, and the uvicorn API container.
+- **Environment Management:** Driven by `.env` variables (such as `POSTGRES_USER`, `SECRET_KEY`, `REDIS_URL`).
+- **Network Resolution:** API URIs in the mobile apps point to external IP addresses mapping back to the local backend during development (e.g., `192.168.100.19`).
+
+---
+
+## 5. Summary of Unfinished / Stubbed Features
+- **Admin Dashboard:** Not implemented.
+- **Wallet Top-Up:** UI exists in the Passenger App, but backend endpoints for DEPOSIT are missing.
+- **Seat Availability:** Trip search logic does not yet deduct `occupied_seats` from `total_seats`.
+- **Payment Gateway Integration:** Direct payment to actual Mobile Money (MOMO) / Bank API gateways is missing; the system currently assumes cash deposits are instantaneous.

@@ -1,0 +1,22 @@
+name: twende_conductor_app
+description: Twende Conductor App
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  google_fonts: any
+  sentry_flutter: any
+  go_router: any
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: any
+
+flutter:
+  uses-material-design: true

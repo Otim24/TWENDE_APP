@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:twende_conductor_app/features/auth/presentation/screens/login_screen.dart';import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:twende_conductor_app/features/auth/presentation/screens/login_screen.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:go_router/go_router.dart';
 
 
 Future<void> main() async {
@@ -23,7 +25,19 @@ class TwendeConductorApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    final GoRouter router = GoRouter(
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/',
+          builder: (BuildContext context, GoRouterState state) {
+            return const LoginScreen();
+          },
+        ),
+      ],
+    );
+
+    return MaterialApp.router(
+      routerConfig: router,
       title: 'Twende Conductor',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -31,8 +45,6 @@ class TwendeConductorApp extends StatelessWidget {
         useMaterial3: true,
         textTheme: GoogleFonts.poppinsTextTheme(),
       ),
-      home: const LoginScreen(),
     );
   }
 }
-

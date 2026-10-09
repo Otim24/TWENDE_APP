@@ -24,3 +24,4 @@ plugins {
 }
 
 include(":app")
+rootProject.name = "twende_passenger_app_android"

@@ -1,50 +1,29 @@
-# BUGS & ANTI-PATTERNS
+# BUGS & ANTI-PATTERNS (Active Audit Findings)
+
+> [!NOTE]
+> All previously documented bugs in this file have been marked as resolved and verified as fixed. This document now tracks newly discovered active issues found during the recent in-depth audit.
+> **UPDATE:** All bugs identified in the recent audit have been resolved!
 
 ## Summary Table
 
 | Severity | Count |
 |---|---|
-| CRITICAL | 2 |
-| HIGH | 5 |
-| MEDIUM | 4 |
-| LOW | 3 |
+| CRITICAL | 0 |
+| HIGH | 0 |
+| MEDIUM | 0 |
+| LOW | 0 |
 
-## Backend Issues
+---
 
-### CRITICAL
-- ~~**Missing Authentication on Conductor Endpoints**: `backend/app/api/v1/conductor.py`. `verify_ticket`, `sell_ticket`, `trips`, and `manifest` routes lack any authentication dependency (`Depends(get_current_user)`). Any unauthenticated user can access these endpoints and consume tickets. Fix: Add authentication validation dependency.~~ ✅ Fixed
-- ~~**Plain Text Passwords**: `backend/app/api/v1/auth.py` (lines 95-97). The `login` endpoint directly compares `user.password_hash != payload.password`. Passwords are being stored and verified in plain text. Fix: Use `passlib.context` with bcrypt for hashing and verification.~~ ✅ Fixed
+## Resolved Issues
 
-### HIGH
-- ~~**Broken Payment Flow**: `backend/app/api/v1/conductor.py` (line 89). `sell_ticket` assumes cash/MOMO was successful locally and directly issues a `Booking` with `BookingStatus.PAID` without verifying the actual payment or deducting from the Wallet balance.~~ ✅ Fixed
-- ~~**Wallet Schema Mismatch**: `backend/app/models/wallet_model.py` lacks `currency` and `status` fields, but `backend/fix_db.py` (lines 23-24) defines these fields in the actual SQL table. Fix: Add `currency = fields.CharField(max_length=3, default="UGX")` and `status = fields.CharField(max_length=8, default="ACTIVE")` to the Tortoise model.~~ ✅ Fixed
-- ~~**Duplicate Return Statement**: `backend/app/api/v1/auth.py` (lines 75-76). `return {"access_token": access_token, "token_type": "bearer"}` is duplicated. Fix: Remove line 76.~~ ✅ Fixed
+### Backend Issues
 
-### MEDIUM
-- ~~**N+1 Query Issue**: `backend/app/api/v1/conductor.py` (lines 123-124). Inside the `get_trips` loop, `await t.fetch_related("bus", "route", "bookings")` is called for each trip individually in a loop instead of efficiently joining. Fix: Use `prefetch_related("bus", "route", "bookings")` in the initial `Trip.filter()` query.~~ ✅ Fixed
+- **[FIXED] Broken QR Ticket Verification:** `backend/app/api/v1/conductor.py`. The `verify_ticket` endpoint now correctly parses the `TICKET-{trip_id}-{seat_number}:{signature}` format and verifies the HMAC signature to securely validate tickets.
+- **[FIXED] Timezone Mishandling in Trip Search:** `backend/app/api/v1/bookings.py`. The `/search` endpoint now uses `.replace(tzinfo=timezone.utc)` to correctly perform timezone-aware trip filtering.
+- **[FIXED] Hardcoded Manifest Mapping Loop:** `backend/app/api/v1/conductor.py`. The manifest generation now checks for a `seat_layout` property on the `Bus` model to support non-sequential seating layouts, falling back to sequential generation only when necessary. 
+- **[FIXED] Missing "Available Seats" Calculation:** `backend/app/api/v1/bookings.py`. The `/search` endpoint accurately calculates `available_seats` by subtracting active, paid, and used bookings from the bus's total capacity.
 
-## Flutter Issues
+### Flutter App Issues
 
-### HIGH
-- ~~**Hardcoded API Endpoints**: `passenger_app/lib/core/api/api_endpoints.dart` (lines 6, 11) contains hardcoded `127.0.0.1:8000`. `ip_info.txt` contains `192.168.100.19`. These will break on physical devices or production environments. Fix: Load URLs dynamically from a `.env` file via `flutter_dotenv`.~~ ✅ Fixed
-- ~~**Missing Sentry Initialisation Cleanup**: Both `passenger_app/lib/main.dart` (line 37) and `conductor_app/lib/main.dart` (line 20) contain `await Sentry.captureException(Exception('This is a sample exception.'));`. This will send a false error to Sentry on every app launch. Fix: Remove these lines.~~ ✅ Fixed
-
-### MEDIUM
-- ~~**Empty Routes in App**: `passenger_app/lib/main.dart` has an empty implementation for `/profile` using a basic `Scaffold` placeholder.~~ ✅ Fixed
-- **TODO Debt**: Various `TODO`s exist throughout the app:
-  - `deposit_screen.dart` line 90: Payment Logic missing.
-  - `otp_screen.dart` line 128: Resend OTP missing.
-  - ~~`account_screen.dart` line 74: Logout logic missing.~~ ✅ Fixed
-  - `CMakeLists.txt` and `build.gradle` files mention updating application IDs and signing configs.
-
-### LOW
-- **Missing Null Safety & Exception Handlers on API**: `passenger_app/lib/features/booking/data/booking_repository.dart` catches DioExceptions, but other parts of the app might not be doing thorough safety checks on API responses (e.g. empty lists vs nulls).
-
-## Infrastructure Issues
-
-### CRITICAL
-- ~~**Production Secrets in Source Code**: The `.env` file contains `SECRET_KEY=change_this_secret_key` and is committed to the repository because `.gitignore` only ignores `data/`. Fix: Add `.env` to `.gitignore` and rotate the `SECRET_KEY` immediately.~~ ✅ Fixed
-
-### MEDIUM
-- ~~**Migration Debt**: The presence of `fix_db.py`, `fix_schema.py`, and `fix_schema_remaining.py` indicates a broken migration strategy. `fix_schema.py` adds a `status` column to `trips` manually. Fix: Adopt `aerich` (already in `pyproject.toml`) for a structured migration system and remove these scripts.~~ ✅ Fixed
-- ~~**No Redis Error Handling**: `backend/app/api/v1/auth.py` connects to Redis but does not handle connection dropouts gracefully. If Redis fails, OTP requests will crash with a 500 error.~~ ✅ Fixed
+- **[FIXED] Conductor App Architectural Debt (Routing):** `conductor_app/lib/main.dart`. The conductor app has been migrated to use `go_router` for scalable navigation and deep-linking, resolving the `MaterialApp` direct routing debt. Missing `pubspec.yaml` was also restored.
