@@ -1,7 +1,6 @@
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:twende_passenger_app/core/widgets/glass_container.dart';
+import 'package:twende_passenger_app/core/theme/app_tokens.dart';
 
 class ActionButton extends StatelessWidget {
   final IconData icon;
@@ -19,20 +18,19 @@ class ActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container( // Using container directly or GlassContainer based on preference
+      child: Container(
         height: 140,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
+          color: Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(20.0), // Padding inside the card
+          padding: const EdgeInsets.all(20.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-               // Make icon larger
-              Icon(icon, size: 48, color: const Color(0xFF4A148C)), // Deep Rich Purple
+              Icon(icon, size: 48, color: AppTokens.primaryDark),
               const SizedBox(height: 16),
               Text(
                 label,
@@ -40,7 +38,7 @@ class ActionButton extends StatelessWidget {
                 style: GoogleFonts.poppins(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
-                  fontSize: 14, // Slightly larger font
+                  fontSize: 14,
                 ),
               ),
             ],

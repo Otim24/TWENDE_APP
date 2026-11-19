@@ -1,37 +1,66 @@
-import 'dart:ui' as ui;
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:go_router/go_router.dart';
+import 'package:gal/gal.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:gal/gal.dart';
+import 'package:twende_conductor_app/core/theme/app_tokens.dart';
 
 class ConductorTicketReceiptScreen extends StatelessWidget {
   final Map<String, dynamic> ticketDetails;
   final GlobalKey _receiptKey = GlobalKey();
-  
+
   ConductorTicketReceiptScreen({
     super.key,
     required this.ticketDetails,
   });
 
+  String get _bookingId =>
+      (ticketDetails['booking_id'] ?? ticketDetails['id'] ?? 'N/A').toString();
+
+  String get _passengerName =>
+      (ticketDetails['passenger_name'] ?? 'Walk-in Passenger').toString();
+
+  String get _seatNumber =>
+      (ticketDetails['seat_number'] ?? 'N/A').toString();
+
+  String get _routeName =>
+      (ticketDetails['route_name'] ?? 'Scheduled Route').toString();
+
+  String get _busPlate =>
+      (ticketDetails['bus_plate'] ?? 'Twende Bus').toString();
+
+  String get _paymentMethod =>
+      (ticketDetails['payment_method'] ?? 'CASH').toString();
+
+  String get _qrPayload {
+    final String raw = (ticketDetails['qr_code_data'] ?? '').toString().trim();
+    if (raw.isNotEmpty) {
+      return raw;
+    }
+    return _bookingId;
+  }
+
   Future<void> _shareTicket() async {
+    final String formattedPrice = AppTokens.formatUgx(ticketDetails['price']);
     final String shareText = '''
-🎫 *Twende Bus Ticket* 🎫
-
-*Passenger:* ${ticketDetails['passenger_name']}
-*Seat:* ${ticketDetails['seat_number']}
-*Route:* ${ticketDetails['route_name'] ?? 'Route Details'}
-*Date:* ${ticketDetails['travel_date']}
-*Trip ID:* ${ticketDetails['trip_id']}
-
-Scan this QR code to verify.
-Safe travels! 🚍
+Twende Bus E-Ticket
+Booking ID: #$_bookingId
+Route: $_routeName ($_busPlate)
+Passenger: $_passengerName
+Seat: #$_seatNumber
+Amount Paid: $formattedPrice ($_paymentMethod)
+Verification Code: $_qrPayload
 ''';
 
-    await Share.share(shareText, subject: 'Twende Ticket: ${ticketDetails['passenger_name']}');
+    await SharePlus.instance.share(
+      ShareParams(
+        text: shareText,
+        subject: 'Twende Ticket #$_bookingId - $_passengerName',
+      ),
+    );
   }
 
   Future<void> _downloadTicket(BuildContext context) async {
@@ -40,20 +69,26 @@ Safe travels! 🚍
         await Gal.requestAccess();
       }
 
-      RenderRepaintBoundary? boundary = _receiptKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      final RenderRepaintBoundary? boundary = _receiptKey.currentContext
+          ?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) return;
 
-      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-      ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      Uint8List pngBytes = byteData!.buffer.asUint8List();
+      final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      final ByteData? byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return;
+      final Uint8List pngBytes = byteData.buffer.asUint8List();
 
       await Gal.putImageBytes(pngBytes, album: 'Twende Tickets');
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Ticket saved to Gallery! 📸", style: GoogleFonts.poppins()),
-            backgroundColor: Colors.green,
+            content: Text(
+              'Ticket saved to gallery.',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: AppTokens.success,
           ),
         );
       }
@@ -61,8 +96,11 @@ Safe travels! 🚍
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Failed to save ticket: $e", style: GoogleFonts.poppins()),
-            backgroundColor: Colors.red,
+            content: Text(
+              'Failed to save ticket: $e',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: AppTokens.danger,
           ),
         );
       }
@@ -71,22 +109,21 @@ Safe travels! 🚍
 
   @override
   Widget build(BuildContext context) {
-    // Extract data
-    final passengerName = ticketDetails['passenger_name'] ?? 'Unknown';
-    final seatNumber = ticketDetails['seat_number']?.toString() ?? 'N/A';
-    final amount = ticketDetails['price']?.toString() ?? '0';
-    final ticketId = "TWD-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}";
+    final String formattedPrice = AppTokens.formatUgx(ticketDetails['price']);
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppTokens.background,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.close, color: Colors.white),
-          onPressed: () => Navigator.pop(context), 
+          onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          "Ticket Issued",
-          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold),
+          'Ticket Issued',
+          style: GoogleFonts.poppins(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
@@ -95,8 +132,7 @@ Safe travels! 🚍
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
-          children: [
-            // Receipt Card
+          children: <Widget>[
             RepaintBoundary(
               key: _receiptKey,
               child: Container(
@@ -109,128 +145,137 @@ Safe travels! 🚍
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
-                  children: [
+                  children: <Widget>[
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "Twende Bus",
-                          style: GoogleFonts.poppins(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF1E1E1E),
+                      children: <Widget>[
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                _routeName,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF1E1E1E),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Booking #$_bookingId • $_busPlate',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 13,
+                                  color: Colors.black54,
+                                  fontFeatures: AppTokens.tabularFigures,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                         IconButton(
+                        IconButton(
                           onPressed: _shareTicket,
-                          icon: const Icon(Icons.share, color: Color(0xFFE91E63)), 
+                          icon: const Icon(
+                            Icons.share_outlined,
+                            color: AppTokens.primary,
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "Ticket ID: $ticketId",
-                      style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 20),
-                    const Divider(color: Colors.grey, thickness: 0.5, height: 1),
-                    const SizedBox(height: 20),
-                    
-                    // Details Grid
+                    const SizedBox(height: 16),
+                    const Divider(color: Colors.black12, thickness: 1, height: 1),
+                    const SizedBox(height: 16),
                     Row(
-                      children: [
-                        _buildDetailItem("Passenger", passengerName),
-                        _buildDetailItem("Seat Number", seatNumber),
+                      children: <Widget>[
+                        _buildDetailItem('Passenger', _passengerName),
+                        const SizedBox(width: 12),
+                        _buildDetailItem('Seat Number', 'Seat #$_seatNumber'),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     Row(
-                      children: [
-                        _buildDetailItem("Price", "UGX $amount"),
-                        _buildDetailItem("Status", "PAID"),
+                      children: <Widget>[
+                        _buildDetailItem('Amount Paid', formattedPrice),
+                        const SizedBox(width: 12),
+                        _buildDetailItem('Payment', '$_paymentMethod • PAID'),
                       ],
                     ),
-                    
-                    const SizedBox(height: 32),
-
-                    // QR Code
+                    const SizedBox(height: 24),
                     Center(
                       child: Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                          border: Border.all(
+                            color: Colors.black.withValues(alpha: 0.12),
+                          ),
                         ),
                         child: QrImageView(
-                          data: ticketId, // In real app, this would be a verifiable hash
+                          data: _qrPayload,
                           version: QrVersions.auto,
-                          size: 150.0,
+                          size: 160.0,
                         ),
                       ),
                     ),
                     const SizedBox(height: 8),
-                     Center(
-                       child: Text(
-                        "Scan to Verify",
+                    Center(
+                      child: Text(
+                        'HMAC-Signed Boarding QR Code',
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.poppins(color: Colors.grey, fontSize: 10),
+                        style: GoogleFonts.poppins(
+                          color: Colors.black54,
+                          fontSize: 11,
+                        ),
                       ),
-                     ),
+                    ),
                   ],
                 ),
               ),
             ),
-            
-            const SizedBox(height: 32),
-            
-            // Actions
+            const SizedBox(height: 28),
             Row(
-              children: [
+              children: <Widget>[
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: const BorderSide(color: Colors.white),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      side: const BorderSide(color: Colors.white38),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                     ),
                     child: Text(
-                      "New Sale",
-                      style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600),
+                      'Done',
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 16),
-                
-                // Download Button
                 Expanded(
-                  child: GestureDetector(
-                    onTap: () => _downloadTicket(context),
-                    child: Container(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _downloadTicket(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTokens.primary,
+                      foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [
-                            Color(0xFF4A148C),
-                            Color(0xFF7B1FA2),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF4A148C).withOpacity(0.5),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        "Download",
-                        style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.download_rounded, size: 20),
+                    label: Text(
+                      'Save Image',
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
                       ),
                     ),
                   ),
@@ -247,15 +292,22 @@ Safe travels! 🚍
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+        children: <Widget>[
           Text(
             label,
-            style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
+            style: GoogleFonts.poppins(color: Colors.black54, fontSize: 12),
           ),
           const SizedBox(height: 4),
           Text(
             value,
-            style: GoogleFonts.poppins(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w600),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.poppins(
+              color: Colors.black87,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              fontFeatures: AppTokens.tabularFigures,
+            ),
           ),
         ],
       ),

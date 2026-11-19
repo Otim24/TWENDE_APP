@@ -1,2 +1,24 @@
-data/
+# Runtime data & backups
+/data/
+
+# Environment & secrets (keep *.env.example tracked)
 .env
+**/.env
+!.env.example
+!**/.env.example
+sentry.properties
+
+# Python cache & test artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Mobile build & IDE clutter
+*.apk
+*.aab
+*.ipa
+.DS_Store
+Thumbs.db

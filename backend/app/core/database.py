@@ -1,4 +1,3 @@
-
 from tortoise import Tortoise
 from app.core.config import settings
 
@@ -12,17 +11,17 @@ TORTOISE_ORM = {
                 "app.models.bus_model",
                 "app.models.trip_model",
                 "app.models.booking_model",
-                "app.models.cargo_model",
-                "aerich.models"
+                "aerich.models",
             ],
             "default_connection": "default",
         },
     },
 }
 
+
 def init_db(app):
     from tortoise.contrib.fastapi import register_tortoise
-    
+
     register_tortoise(
         app,
         config=TORTOISE_ORM,

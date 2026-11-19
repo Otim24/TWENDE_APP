@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:twende_conductor_app/core/theme/app_tokens.dart';
 
 class ConductorSeatGrid extends StatelessWidget {
-  final List<dynamic> manifest; // List of ManifestItem maps
-  final Function(Map<String, dynamic>) onSeatTap;
+  final List<dynamic> manifest;
+  final void Function(Map<String, dynamic>) onSeatTap;
 
   const ConductorSeatGrid({
     super.key,
@@ -14,28 +15,38 @@ class ConductorSeatGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (manifest.isEmpty) {
-      return const Center(child: Text("No seat data available"));
+      return Center(
+        child: Text(
+          'No seat manifest available for this trip.',
+          style: GoogleFonts.poppins(color: Colors.white54),
+        ),
+      );
     }
 
-    return Container(
-      padding: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: GridView.builder(
+        padding: const EdgeInsets.only(bottom: 16),
         itemCount: manifest.length,
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 4,
           childAspectRatio: 1.0,
-          crossAxisSpacing: 12, // Increased spacing
+          crossAxisSpacing: 12,
           mainAxisSpacing: 12,
         ),
-        itemBuilder: (context, index) {
-          final item = manifest[index];
-          // status: AVAILABLE, BOOKED, OCCUPIED
-          final status = item['status'] as String;
-          final seatNum = item['seat_number'] as int;
+        itemBuilder: (BuildContext context, int index) {
+          final Map<String, dynamic> item =
+              Map<String, dynamic>.from(manifest[index] as Map);
+          final String status = AppTokens.normalizeSeatStatus(item['status']);
+          final int seatNum = (item['seat_number'] as num?)?.toInt() ?? (index + 1);
 
-          return GestureDetector(
-            onTap: () => onSeatTap(item),
-            child: _buildSeatItem(seatNum, status),
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => onSeatTap(item),
+              child: _buildSeatItem(seatNum, status),
+            ),
           );
         },
       ),
@@ -45,22 +56,23 @@ class ConductorSeatGrid extends StatelessWidget {
   Widget _buildSeatItem(int seatNumber, String status) {
     Color bg;
     Border? border;
-    IconData icon = Icons.event_seat;
-    Color contentColor = Colors.white54; // Default text color
+    IconData icon = Icons.event_seat_rounded;
+    Color contentColor = Colors.white70;
 
     switch (status) {
       case 'OCCUPIED':
-        bg = Colors.green;
+        bg = AppTokens.occupied;
         contentColor = Colors.white;
-        icon = Icons.check_circle;
+        icon = Icons.check_circle_rounded;
         break;
       case 'BOOKED':
-        bg = const Color(0xFF7B1FA2); // Imperial Purple
+        bg = AppTokens.booked;
         contentColor = Colors.white;
+        icon = Icons.person_pin_circle_rounded;
         break;
       case 'AVAILABLE':
       default:
-        bg = const Color(0xFF1E1E1E); // Dark Grey
+        bg = AppTokens.available;
         border = Border.all(color: Colors.white24);
         break;
     }
@@ -68,28 +80,26 @@ class ConductorSeatGrid extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(12), // Softer corners
+        borderRadius: BorderRadius.circular(12),
         border: border,
-        boxShadow: status != 'AVAILABLE' 
-          ? [BoxShadow(color: bg.withOpacity(0.4), blurRadius: 4, offset: const Offset(0, 2))] 
-          : null,
       ),
       child: Stack(
-        children: [
+        children: <Widget>[
           Center(
             child: Icon(
               icon,
-              color: contentColor.withOpacity(0.3), // Faint background icon
+              color: contentColor.withValues(alpha: 0.22),
               size: 28,
             ),
           ),
           Center(
             child: Text(
-              "$seatNumber",
+              '$seatNumber',
               style: GoogleFonts.poppins(
-                fontSize: 14, 
-                color: contentColor, 
-                fontWeight: FontWeight.bold
+                fontSize: 14,
+                color: contentColor,
+                fontWeight: FontWeight.bold,
+                fontFeatures: AppTokens.tabularFigures,
               ),
             ),
           ),

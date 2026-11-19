@@ -17,7 +17,14 @@ class Bus(TimestampMixin, models.Model):
     class Meta:
         table = "buses"
 
+    def get_valid_seats(self) -> list[int]:
+        if isinstance(self.seat_layout, list) and len(self.seat_layout) > 0:
+            return [int(s) for s in self.seat_layout]
+        return list(range(1, (self.total_seats or 60) + 1))
+
+    @property
+    def capacity(self) -> int:
+        return len(self.get_valid_seats())
+
     def __str__(self):
         return self.plate_number
-
-

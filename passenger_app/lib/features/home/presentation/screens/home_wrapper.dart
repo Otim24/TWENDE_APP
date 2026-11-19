@@ -1,6 +1,6 @@
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:twende_passenger_app/core/theme/app_tokens.dart';
 import 'package:twende_passenger_app/features/account/presentation/screens/account_screen.dart';
 import 'package:twende_passenger_app/features/activity/presentation/screens/activity_screen.dart';
 import 'package:twende_passenger_app/features/home/presentation/screens/home_content.dart';
@@ -30,16 +30,16 @@ class _HomeWrapperState extends State<HomeWrapper> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black, // Charcoal Black / Pure Black
+      backgroundColor: Colors.black,
       body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        switchInCurve: Curves.easeInOut,
-        switchOutCurve: Curves.easeInOut,
+        duration: AppTokens.fastDuration,
+        switchInCurve: AppTokens.easeOutCurve,
+        switchOutCurve: AppTokens.easeOutCurve,
         child: KeyedSubtree(
           key: ValueKey<int>(_selectedIndex),
           child: _screens[_selectedIndex],
         ),
-      ), // Switch body based on index
+      ),
       bottomNavigationBar: Container(
         color: Colors.black,
         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -47,9 +47,9 @@ class _HomeWrapperState extends State<HomeWrapper> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(0, Icons.directions_car_filled_rounded, "Twende"),
-              _buildNavItem(1, Icons.receipt_long_rounded, "Activity"),
-              _buildNavItem(2, Icons.person_outline_rounded, "My Account"),
+              _buildNavItem(0, Icons.directions_bus_filled_rounded, 'Twende'),
+              _buildNavItem(1, Icons.receipt_long_rounded, 'Activity'),
+              _buildNavItem(2, Icons.person_outline_rounded, 'My Account'),
             ],
           ),
         ),
@@ -58,7 +58,7 @@ class _HomeWrapperState extends State<HomeWrapper> {
   }
 
   Widget _buildNavItem(int index, IconData icon, String label) {
-    final isSelected = _selectedIndex == index;
+    final bool isSelected = _selectedIndex == index;
     return GestureDetector(
       onTap: () => _onItemTapped(index),
       behavior: HitTestBehavior.opaque,
@@ -67,7 +67,7 @@ class _HomeWrapperState extends State<HomeWrapper> {
         children: [
           Icon(
             icon,
-            color: isSelected ? const Color(0xFF4A148C) : Colors.white38,
+            color: isSelected ? AppTokens.primary : Colors.white38,
             size: 24,
           ),
           const SizedBox(height: 4),
@@ -75,7 +75,7 @@ class _HomeWrapperState extends State<HomeWrapper> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFF4A148C).withOpacity(0.2), // Pill Activity
+                color: AppTokens.primaryDark.withValues(alpha: 0.25),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -83,7 +83,7 @@ class _HomeWrapperState extends State<HomeWrapper> {
                 style: GoogleFonts.outfit(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: const Color(0xFF4A148C),
+                  color: Colors.white,
                 ),
               ),
             )

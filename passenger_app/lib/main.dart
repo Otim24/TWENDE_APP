@@ -1,49 +1,66 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:twende_passenger_app/config/theme.dart';
+import 'package:twende_passenger_app/core/api/api_endpoints.dart';
+import 'package:twende_passenger_app/core/theme/app_tokens.dart';
+import 'package:twende_passenger_app/features/account/presentation/screens/account_screen.dart';
 import 'package:twende_passenger_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:twende_passenger_app/features/auth/presentation/screens/otp_screen.dart';
-import 'package:twende_passenger_app/features/home/presentation/screens/home_wrapper.dart';
-import 'package:twende_passenger_app/features/booking/presentation/screens/search_results_screen.dart';
-import 'package:twende_passenger_app/features/booking/presentation/screens/bus_details_screen.dart';
-import 'package:twende_passenger_app/features/booking/presentation/screens/seat_selection_screen.dart';
-import 'package:twende_passenger_app/features/wallet/presentation/screens/deposit_screen.dart';
 import 'package:twende_passenger_app/features/auth/presentation/screens/splash_screen.dart';
-import 'package:twende_passenger_app/features/payment/presentation/screens/payment_screen.dart';
+import 'package:twende_passenger_app/features/booking/presentation/screens/bus_details_screen.dart';
+import 'package:twende_passenger_app/features/booking/presentation/screens/search_results_screen.dart';
+import 'package:twende_passenger_app/features/booking/presentation/screens/seat_selection_screen.dart';
 import 'package:twende_passenger_app/features/booking/presentation/screens/ticket_receipt_screen.dart';
+import 'package:twende_passenger_app/features/home/presentation/screens/home_wrapper.dart';
+import 'package:twende_passenger_app/features/payment/presentation/screens/payment_screen.dart';
+import 'package:twende_passenger_app/features/tracking/presentation/screens/tracking_screen.dart';
+import 'package:twende_passenger_app/features/wallet/presentation/screens/deposit_screen.dart';
 import 'package:twende_passenger_app/features/wallet/presentation/screens/wallet_dashboard_screen.dart';
-import 'package:twende_passenger_app/features/account/presentation/screens/account_screen.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 Future<void> main() async {
-  await dotenv.load(fileName: ".env");
-  await SentryFlutter.init(
-    (options) {
-      options.dsn = 'https://6aa30fe8a75ef59b37d0a3c8f33c180c@o4511531098832896.ingest.us.sentry.io/4511531149950976';
-      // Set tracesSampleRate to 1.0 to capture 100% of transactions for tracing.
-      // We recommend adjusting this value in production.
-      options.tracesSampleRate = 1.0;
-      // The sampling rate for profiling is relative to tracesSampleRate
-      // Setting to 1.0 will profile 100% of sampled transactions:
-      options.profilesSampleRate = 1.0;
-    },
-    appRunner: () => runApp(SentryWidget(child: 
-    const ProviderScope(
-      child: TwendePassengerApp(),
-    ),
-  )),
-  );
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (_) {}
+
+  final String dsn = ApiEndpoints.sentryDsn;
+  if (dsn.isNotEmpty) {
+    await SentryFlutter.init(
+      (options) {
+        options.dsn = dsn;
+        options.sendDefaultPii = false;
+        options.tracesSampleRate = 0.2;
+      },
+      appRunner: () => runApp(
+        SentryWidget(
+          child: const ProviderScope(
+            child: TwendePassengerApp(),
+          ),
+        ),
+      ),
+    );
+  } else {
+    runApp(
+      const ProviderScope(
+        child: TwendePassengerApp(),
+      ),
+    );
+  }
 }
 
-// Router Configuration
-final _router = GoRouter(
-  initialLocation: '/login',
+final GoRouter _router = GoRouter(
+  initialLocation: '/splash',
   routes: [
     GoRoute(
       path: '/',
-      redirect: (_, __) => '/login',
+      redirect: (_, __) => '/splash',
+    ),
+    GoRoute(
+      path: '/splash',
+      builder: (context, state) => const SplashScreen(),
     ),
     GoRoute(
       path: '/login',
@@ -52,13 +69,9 @@ final _router = GoRouter(
     GoRoute(
       path: '/otp',
       builder: (context, state) {
-        final phone = state.extra as String;
+        final String phone = (state.extra ?? '').toString();
         return OtpScreen(phone: phone);
       },
-    ),
-    GoRoute(
-      path: '/splash',
-      builder: (context, state) => const SplashScreen(),
     ),
     GoRoute(
       path: '/home',
@@ -66,9 +79,15 @@ final _router = GoRouter(
         key: state.pageKey,
         child: const HomeWrapper(),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(opacity: animation, child: child);
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: AppTokens.easeOutCurve,
+            ),
+            child: child,
+          );
         },
-        transitionDuration: const Duration(milliseconds: 800), // Smooth Cross-fade
+        transitionDuration: AppTokens.normalDuration,
       ),
     ),
     GoRoute(
@@ -82,48 +101,80 @@ final _router = GoRouter(
     GoRoute(
       path: '/search_results',
       builder: (context, state) {
-        final extras = state.extra as Map<String, String>;
+        final Map<String, dynamic> extras = state.extra is Map
+            ? (state.extra as Map).cast<String, dynamic>()
+            : <String, dynamic>{};
         return SearchResultsScreen(
-          fromLocation: extras['from'] ?? 'Unknown',
-          toLocation: extras['to'] ?? 'Unknown',
+          fromLocation: (extras['from'] ?? 'Kampala').toString(),
+          toLocation: (extras['to'] ?? 'Gulu').toString(),
+          initialDate: extras['date']?.toString(),
         );
       },
     ),
     GoRoute(
       path: '/bus_details',
       builder: (context, state) {
-        final bus = state.extra as Map<String, dynamic>;
+        final Map<String, dynamic> bus = state.extra is Map
+            ? (state.extra as Map).cast<String, dynamic>()
+            : <String, dynamic>{};
         return BusDetailsScreen(bus: bus);
       },
     ),
     GoRoute(
       path: '/seat_selection',
       builder: (context, state) {
-        final busDetails = state.extra as Map<String, dynamic>;
+        final Map<String, dynamic> busDetails = state.extra is Map
+            ? (state.extra as Map).cast<String, dynamic>()
+            : <String, dynamic>{};
         return SeatSelectionScreen(busDetails: busDetails);
       },
     ),
     GoRoute(
       path: '/payment',
       builder: (context, state) {
-        final extras = state.extra as Map<String, dynamic>;
+        final Map<String, dynamic> extras = state.extra is Map
+            ? (state.extra as Map).cast<String, dynamic>()
+            : <String, dynamic>{};
+        final Map<String, dynamic> busDetails = extras['busDetails'] is Map
+            ? (extras['busDetails'] as Map).cast<String, dynamic>()
+            : <String, dynamic>{};
+        final List<int> selectedSeats = (extras['selectedSeats'] is List)
+            ? (extras['selectedSeats'] as List)
+                .map((e) => int.tryParse(e.toString()) ?? 0)
+                .where((s) => s > 0)
+                .toList()
+            : <int>[];
+        final int seatCount = selectedSeats.isNotEmpty
+            ? selectedSeats.length
+            : (int.tryParse((extras['seatCount'] ?? '1').toString()) ?? 1);
         return PaymentScreen(
-          busDetails: extras['busDetails'],
-          seatCount: extras['seatCount'],
+          busDetails: busDetails,
+          seatCount: seatCount,
+          selectedSeats: selectedSeats,
         );
       },
     ),
     GoRoute(
       path: '/receipt',
       builder: (context, state) {
-        final bookingDetails = state.extra as Map<String, dynamic>;
+        final Map<String, dynamic> bookingDetails = state.extra is Map
+            ? (state.extra as Map).cast<String, dynamic>()
+            : <String, dynamic>{};
         return TicketReceiptScreen(bookingDetails: bookingDetails);
       },
     ),
-    // Add more routes here
+    GoRoute(
+      path: '/tracking',
+      builder: (context, state) {
+        final Map<String, dynamic> tripData = state.extra is Map
+            ? (state.extra as Map).cast<String, dynamic>()
+            : <String, dynamic>{};
+        return TrackingScreen(tripData: tripData);
+      },
+    ),
     GoRoute(
       path: '/profile',
-      builder: (context, state) => const AccountScreen(),
+      builder: (context, state) => const AccountScreen(isStandalone: true),
     ),
   ],
 );

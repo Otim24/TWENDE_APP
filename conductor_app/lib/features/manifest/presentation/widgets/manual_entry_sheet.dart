@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:twende_conductor_app/core/theme/app_tokens.dart';
 
 class ManualEntrySheet extends StatefulWidget {
   final List<dynamic> manifest;
-  final Function(int) onBoardPassenger;
+  final Set<int> boardingIds;
+  final Future<void> Function(int) onBoardPassenger;
 
   const ManualEntrySheet({
-    super.key, 
-    required this.manifest, 
-    required this.onBoardPassenger
+    super.key,
+    required this.manifest,
+    required this.boardingIds,
+    required this.onBoardPassenger,
   });
 
   @override
@@ -16,148 +19,227 @@ class ManualEntrySheet extends StatefulWidget {
 }
 
 class _ManualEntrySheetState extends State<ManualEntrySheet> {
-  String _searchQuery = "";
-  List<dynamic> _searchResults = [];
+  String _searchQuery = '';
+  final Set<int> _localBusyIds = <int>{};
 
-  void _search(String query) {
-    setState(() {
-      _searchQuery = query;
-      if (query.isEmpty) {
-        _searchResults = [];
-      } else {
-        _searchResults = widget.manifest.where((p) {
-          final q = query.toLowerCase();
-          final name = (p['passenger_name'] ?? '').toString().toLowerCase();
-          final phone = (p['passenger_phone'] ?? '').toString().toLowerCase();
-          final ticket = (p['booking_id'] ?? '').toString().toLowerCase();
-          final seat = (p['seat_number'] ?? '').toString().toLowerCase(); // User also mentioned seat
+  List<Map<String, dynamic>> get _filteredResults {
+    final String q = _searchQuery.trim().toLowerCase();
+    final Iterable<Map<String, dynamic>> bookedOrBoarded = widget.manifest
+        .map((dynamic item) => Map<String, dynamic>.from(item as Map))
+        .where(
+          (Map<String, dynamic> p) =>
+              AppTokens.normalizeSeatStatus(p['status']) != 'AVAILABLE' &&
+              p['booking_id'] != null,
+        );
 
-          return name.contains(q) || phone.contains(q) || ticket.contains(q) || seat == q;
-        }).toList();
+    if (q.isEmpty) {
+      return bookedOrBoarded.toList();
+    }
+
+    return bookedOrBoarded.where((Map<String, dynamic> p) {
+      final String name = (p['passenger_name'] ?? '').toString().toLowerCase();
+      final String phone = (p['passenger_phone'] ?? '').toString().toLowerCase();
+      final String ticket = (p['booking_id'] ?? '').toString().toLowerCase();
+      final String seat = (p['seat_number'] ?? '').toString().toLowerCase();
+      return name.contains(q) ||
+          phone.contains(q) ||
+          ticket.contains(q) ||
+          seat == q;
+    }).toList();
+  }
+
+  Future<void> _handleBoard(int bookingId) async {
+    if (_localBusyIds.contains(bookingId) ||
+        widget.boardingIds.contains(bookingId)) {
+      return;
+    }
+    setState(() => _localBusyIds.add(bookingId));
+    try {
+      await widget.onBoardPassenger(bookingId);
+      if (mounted) {
+        Navigator.pop(context);
       }
-    });
+    } finally {
+      if (mounted) {
+        setState(() => _localBusyIds.remove(bookingId));
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.85, 
-      decoration: const BoxDecoration(
-        color: Color(0xFF121212),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        children: [
-          // Drag Handle
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 20),
-              width: 40, height: 4,
-              decoration: BoxDecoration(color: Colors.grey[800], borderRadius: BorderRadius.circular(2)),
-            ),
-          ),
-          
-          // Title
-          Text(
-            "Manual Verification",
-            style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            "Search by Name, Phone, Ticket # or Seat",
-            style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12),
-          ),
-          
-          const SizedBox(height: 20),
-          
-          // Search Bar
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: TextField(
-              onChanged: _search,
-              style: GoogleFonts.poppins(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: "Type to search...",
-                hintStyle: GoogleFonts.poppins(color: Colors.white38),
-                prefixIcon: const Icon(Icons.search, color: Color(0xFF7B1FA2)),
-                filled: true,
-                fillColor: const Color(0xFF1E1E1E),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+    final List<Map<String, dynamic>> results = _filteredResults;
+    final double bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.82,
+        decoration: const BoxDecoration(
+          color: AppTokens.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: <Widget>[
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 16),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ),
-          
-          const SizedBox(height: 20),
-          
-          // Results
-          Expanded(
-            child: _searchQuery.isEmpty 
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                       const Icon(Icons.touch_app, color: Colors.white24, size: 48),
-                       const SizedBox(height: 12),
-                       Text("Enter details to verify", style: GoogleFonts.poppins(color: Colors.white24)),
-                    ],
-                  )
-                )
-              : _searchResults.isEmpty 
-                  ? Center(child: Text("No passengers found", style: GoogleFonts.poppins(color: Colors.white54)))
+            Text(
+              'Manual Passenger Verification',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Search by Name, Phone, Ticket # or Seat #',
+              style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: TextField(
+                autofocus: true,
+                onChanged: (String val) => setState(() => _searchQuery = val),
+                style: GoogleFonts.poppins(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Type name, phone, ticket # or seat...',
+                  hintStyle: GoogleFonts.poppins(color: Colors.white38),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: AppTokens.accent,
+                  ),
+                  filled: true,
+                  fillColor: AppTokens.surfaceElevated,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: AppTokens.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: AppTokens.border),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: results.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No booked passengers match your search.',
+                        style: GoogleFonts.poppins(color: Colors.white54),
+                      ),
+                    )
                   : ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      itemCount: _searchResults.length,
-                      separatorBuilder: (_,__) => const Divider(color: Colors.white10),
-                      itemBuilder: (context, index) {
-                        final p = _searchResults[index];
-                        final bool isBoarded = p['status'] == 'USED';
-                        final bool isPaid = p['status'] == 'OCCUPIED' || isBoarded;
-                        
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                      itemCount: results.length,
+                      separatorBuilder: (_, __) =>
+                          const Divider(color: Colors.white10),
+                      itemBuilder: (BuildContext context, int index) {
+                        final Map<String, dynamic> p = results[index];
+                        final String status =
+                            AppTokens.normalizeSeatStatus(p['status']);
+                        final bool isBoarded = status == 'OCCUPIED';
+                        final int? bookingId =
+                            (p['booking_id'] as num?)?.toInt();
+                        final bool isBusy = bookingId != null &&
+                            (_localBusyIds.contains(bookingId) ||
+                                widget.boardingIds.contains(bookingId));
+
                         return ListTile(
                           contentPadding: EdgeInsets.zero,
                           leading: CircleAvatar(
-                            backgroundColor: isBoarded ? Colors.green[900] : const Color(0xFF7B1FA2),
-                            child: Icon(
-                               isBoarded ? Icons.check : Icons.person, 
-                               color: Colors.white, size: 20
+                            backgroundColor: isBoarded
+                                ? AppTokens.occupied
+                                : AppTokens.booked,
+                            child: Text(
+                              '${p['seat_number'] ?? '-'}',
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                fontFeatures: AppTokens.tabularFigures,
+                              ),
                             ),
                           ),
                           title: Text(
-                            p['passenger_name'] ?? "Unknown",
-                            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold),
+                            (p['passenger_name'] ?? 'Unknown').toString(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text("Seat ${p['seat_number']} • ${p['passenger_phone'] ?? 'No Phone'}", style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12)),
-                              Text("Ticket #${p['booking_id']}", style: GoogleFonts.poppins(color: Colors.white38, fontSize: 10)),
-                            ],
+                          subtitle: Text(
+                            'Seat #${p['seat_number']} • ${p['passenger_phone'] ?? 'No phone'} • Ticket #${bookingId ?? 'N/A'}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              color: Colors.white54,
+                              fontSize: 12,
+                              fontFeatures: AppTokens.tabularFigures,
+                            ),
                           ),
-                          trailing: isBoarded 
-                            ? const Icon(Icons.check_circle, color: Colors.green)
-                            : SizedBox(
-                                height: 36,
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    widget.onBoardPassenger(p['booking_id']);
-                                    Navigator.pop(context); 
-                                    // Optional: Keep open? User said "Conductor taps Mark as Boarded. That's it."
-                                    // Closing feels better for flow, or toast. Let's close for now.
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF2E7D32),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                          trailing: isBoarded
+                              ? const Icon(
+                                  Icons.check_circle_rounded,
+                                  color: Colors.greenAccent,
+                                )
+                              : SizedBox(
+                                  height: 36,
+                                  child: ElevatedButton(
+                                    onPressed: (bookingId == null || isBusy)
+                                        ? null
+                                        : () => _handleBoard(bookingId),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTokens.success,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                    child: isBusy
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : Text(
+                                            'Board',
+                                            style: GoogleFonts.poppins(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                            ),
+                                          ),
                                   ),
-                                  child: Text("Board", style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                                 ),
-                              ),
                         );
                       },
                     ),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,16 +1,17 @@
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:twende_passenger_app/core/theme/app_tokens.dart';
 
 class AppTheme {
   static final darkTheme = ThemeData(
     brightness: Brightness.dark,
     scaffoldBackgroundColor: Colors.black,
-    primaryColor: const Color(0xFF4A148C),
+    primaryColor: AppTokens.primaryDark,
     colorScheme: const ColorScheme.dark(
-      primary: Color(0xFF4A148C),
-      secondary: Color(0xFF7C4DFF),
-      surface: Color(0xFF2C2C2C),
+      primary: AppTokens.primaryDark,
+      secondary: AppTokens.primary,
+      surface: AppTokens.surface,
+      error: AppTokens.danger,
     ),
     textTheme: GoogleFonts.poppinsTextTheme(
       ThemeData.dark().textTheme,
@@ -20,7 +21,7 @@ class AppTheme {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: Colors.white.withOpacity(0.05),
+      fillColor: Colors.white.withValues(alpha: 0.05),
       hintStyle: const TextStyle(color: Colors.white38),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -28,16 +29,16 @@ class AppTheme {
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF4A148C)),
+        borderSide: const BorderSide(color: AppTokens.primaryDark),
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF4A148C),
+        backgroundColor: AppTokens.primaryDark,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(vertical: 16),
         shape: RoundedRectangleBorder(

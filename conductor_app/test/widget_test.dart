@@ -1,30 +1,55 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-
+import 'package:twende_conductor_app/core/api/api_client.dart';
+import 'package:twende_conductor_app/core/theme/app_tokens.dart';
 import 'package:twende_conductor_app/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('AppTokens currency & status helpers', () {
+    test('parseUgx and formatUgx handle backend Decimal strings without merging decimals', () {
+      expect(AppTokens.parseUgx('30000.00'), 30000);
+      expect(AppTokens.formatUgx('30000.00'), 'UGX 30,000');
+      expect(AppTokens.formatUgx(35000), 'UGX 35,000');
+      expect(AppTokens.formatUgx('UGX 14,890.00'), 'UGX 14,890');
+      expect(AppTokens.formatUgx('0.00'), 'UGX 0');
+    });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    test('normalizeSeatStatus maps legacy and backend statuses consistently', () {
+      expect(AppTokens.normalizeSeatStatus('AVAILABLE'), 'AVAILABLE');
+      expect(AppTokens.normalizeSeatStatus('BOOKED'), 'BOOKED');
+      expect(AppTokens.normalizeSeatStatus('PAID'), 'BOOKED');
+      expect(AppTokens.normalizeSeatStatus('OCCUPIED'), 'OCCUPIED');
+      expect(AppTokens.normalizeSeatStatus('USED'), 'OCCUPIED');
+    });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    test('AuthSession stores and clears conductor JWT session cleanly', () {
+      AuthSession.clearSession();
+      expect(AuthSession.isAuthenticated, isFalse);
+
+      AuthSession.saveSession(
+        accessToken: 'jwt-token-123',
+        userName: 'John Conductor',
+        role: 'CONDUCTOR',
+      );
+      expect(AuthSession.isAuthenticated, isTrue);
+      expect(AuthSession.token, 'jwt-token-123');
+      expect(AuthSession.userName, 'John Conductor');
+
+      AuthSession.clearSession();
+      expect(AuthSession.isAuthenticated, isFalse);
+      expect(AuthSession.token, isNull);
+    });
+  });
+
+  testWidgets('TwendeConductorApp boots to LoginScreen', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: TwendeConductorApp(),
+      ),
+    );
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Twende Conductor'), findsOneWidget);
+    expect(find.text('Sign In to Shift'), findsOneWidget);
   });
 }

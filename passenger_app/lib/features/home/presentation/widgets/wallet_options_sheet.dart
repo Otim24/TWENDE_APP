@@ -1,49 +1,55 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:twende_passenger_app/core/theme/app_tokens.dart';
+import 'package:twende_passenger_app/features/wallet/data/wallet_repository.dart';
 
-class WalletOptionsSheet extends StatefulWidget {
+class WalletOptionsSheet extends ConsumerStatefulWidget {
   const WalletOptionsSheet({super.key});
 
   @override
-  State<WalletOptionsSheet> createState() => _WalletOptionsSheetState();
+  ConsumerState<WalletOptionsSheet> createState() => _WalletOptionsSheetState();
 }
 
-class _WalletOptionsSheetState extends State<WalletOptionsSheet> {
-  bool _isBalanceVisible = false;
+class _WalletOptionsSheetState extends ConsumerState<WalletOptionsSheet> {
+  bool _isBalanceVisible = true;
 
   @override
   Widget build(BuildContext context) {
+    final walletAsync = ref.watch(walletBalanceProvider);
+    final String formattedBalance = walletAsync.maybeWhen(
+      data: (data) => AppTokens.formatUgx(data['balance']),
+      orElse: () => 'UGX 0',
+    );
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24.0),
       decoration: const BoxDecoration(
-        color: Colors.black, // Matching My Wallet button
+        color: Colors.black,
         borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center, // Center the narrower buttons
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Handle Bar
           Center(
             child: Container(
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white24, // Lighter for visibility on black
+                color: Colors.white24,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
           const SizedBox(height: 20),
-
-          // Wallet Balance Display
           Center(
             child: Column(
               children: [
                 Text(
-                  "Wallet Balance",
+                  'Wallet Balance',
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     color: Colors.white70,
@@ -55,11 +61,12 @@ class _WalletOptionsSheetState extends State<WalletOptionsSheet> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      _isBalanceVisible ? "UGX 50,000" : "UGX ••••••",
+                      _isBalanceVisible ? formattedBalance : 'UGX ••••••',
                       style: GoogleFonts.poppins(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
+                        fontFeatures: AppTokens.tabularFigures,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -70,7 +77,9 @@ class _WalletOptionsSheetState extends State<WalletOptionsSheet> {
                         });
                       },
                       child: Icon(
-                        _isBalanceVisible ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                        _isBalanceVisible
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
                         color: Colors.white70,
                         size: 22,
                       ),
@@ -81,75 +90,55 @@ class _WalletOptionsSheetState extends State<WalletOptionsSheet> {
             ),
           ),
           const SizedBox(height: 32),
-
-          // Options Grid
-          
-          _buildOptionButton(
-            context,
-            icon: Icons.settings_outlined,
-            label: "Wallet Settings",
-            onTap: () {
-              Navigator.pop(context); 
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Settings Coming Soon")),
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-
-          _buildOptionButton(
-            context,
-            icon: Icons.history_rounded,
-            label: "Transaction History",
-            onTap: () {
-              Navigator.pop(context);
-               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("History Coming Soon")),
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-
           _buildOptionButton(
             context,
             icon: Icons.add_circle_outline_rounded,
-            label: "Deposit Money",
+            label: 'Deposit Money',
             onTap: () {
               Navigator.pop(context);
-              context.push('/wallet/deposit'); 
+              context.push('/wallet/deposit');
             },
           ),
-          
-          const SizedBox(height: 32), 
+          const SizedBox(height: 16),
+          _buildOptionButton(
+            context,
+            icon: Icons.account_balance_wallet_outlined,
+            label: 'Open Wallet Dashboard',
+            onTap: () {
+              Navigator.pop(context);
+              context.push('/wallet');
+            },
+          ),
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  Widget _buildOptionButton(BuildContext context, {
-    required IconData icon, 
-    required String label, 
-    required VoidCallback onTap
+  Widget _buildOptionButton(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 60,
-        // Reduced width by adding margin
-        margin: const EdgeInsets.symmetric(horizontal: 40), 
+        height: 56,
+        margin: const EdgeInsets.symmetric(horizontal: 24),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [
-              Color(0xFF4A148C),
-              Color(0xFF7B1FA2),
+              AppTokens.primaryDark,
+              AppTokens.primary,
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(30), // Increased radius for pill shape
+          borderRadius: BorderRadius.circular(30),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF4A148C).withOpacity(0.3),
+              color: AppTokens.primaryDark.withValues(alpha: 0.3),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),

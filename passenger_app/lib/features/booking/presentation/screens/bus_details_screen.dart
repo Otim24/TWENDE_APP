@@ -1,127 +1,207 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:twende_passenger_app/core/api/api_endpoints.dart';
+import 'package:twende_passenger_app/core/theme/app_tokens.dart';
+import 'package:twende_passenger_app/features/booking/data/booking_repository.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-class BusDetailsScreen extends StatefulWidget {
+class BusDetailsScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> bus;
 
   const BusDetailsScreen({super.key, required this.bus});
 
   @override
-  State<BusDetailsScreen> createState() => _BusDetailsScreenState();
+  ConsumerState<BusDetailsScreen> createState() => _BusDetailsScreenState();
 }
 
-class _BusDetailsScreenState extends State<BusDetailsScreen> with SingleTickerProviderStateMixin {
-  // Kampala Coordinates
-  // Map & Tracking State
-  MaplibreMapController? _mapController;
+class _BusDetailsScreenState extends ConsumerState<BusDetailsScreen> {
+  MapLibreMapController? _mapController;
   WebSocketChannel? _channel;
-  final LatLng _center = const LatLng(0.3476, 32.5825); // Default: Kampala
+  final LatLng _center = const LatLng(0.3476, 32.5825); // Kampala
 
-  // UI State
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
-  late int _currentAvailableSeats;
+  late Map<String, dynamic> _tripDetails;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    // Initialize available seats logic
-    try {
-      _currentAvailableSeats = int.parse(widget.bus['seats'].toString().split(' ')[0]); // Handle "4" or "4 seats"
-    } catch (e) {
-      _currentAvailableSeats = 4; // Fallback default
-    }
-
-    _pulseController = AnimationController(
-       vsync: this,
-       duration: const Duration(milliseconds: 1000),
-    )..repeat(reverse: true);
-    
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-    
+    _tripDetails = Map<String, dynamic>.from(widget.bus);
+    _loadLiveTripDetails();
     _connectWebSocket();
   }
 
-  void _connectWebSocket() {
-    // Using dotenv for environmental config
-    final wsUrl = dotenv.env['WS_URL'] ?? 'wss://127.0.0.1:8000/api/v1/tracking'; 
-    final tripId = widget.bus['id'] ?? 1;
-    
+  int get _tripId =>
+      int.tryParse((_tripDetails['id'] ?? widget.bus['id'] ?? '1').toString()) ??
+      1;
+
+  Future<void> _loadLiveTripDetails() async {
     try {
-      _channel = WebSocketChannel.connect(Uri.parse('$wsUrl/$tripId'));
-      
-      _channel!.stream.listen((message) {
-        final data = jsonDecode(message);
-        if (data['lat'] != null && data['lng'] != null) {
-          _updateBusLocation(LatLng(data['lat'], data['lng']));
-        }
+      final Map<String, dynamic> fresh =
+          await ref.read(bookingRepositoryProvider).getTripDetails(_tripId);
+      if (!mounted) return;
+      setState(() {
+        _tripDetails = <String, dynamic>{
+          ..._tripDetails,
+          ...fresh,
+          if (fresh['bus'] is Map && fresh['bus']['plate'] != null)
+            'bus_plate': fresh['bus']['plate'],
+        };
+        _isLoading = false;
       });
-    } catch (e) {
-      debugPrint("WebSocket Error: $e");
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
     }
   }
 
-  void _onMapCreated(MaplibreMapController controller) async {
+  void _connectWebSocket() {
+    final String wsBase = ApiEndpoints.wsUrl;
+    try {
+      _channel = WebSocketChannel.connect(Uri.parse('$wsBase/ws/$_tripId'));
+      _channel!.stream.listen(
+        (message) {
+          try {
+            final dynamic data = jsonDecode(message.toString());
+            if (data is Map && data['lat'] != null && data['lng'] != null) {
+              final double? lat = double.tryParse(data['lat'].toString());
+              final double? lng = double.tryParse(data['lng'].toString());
+              if (lat != null && lng != null) {
+                _updateBusLocation(LatLng(lat, lng));
+              }
+            }
+          } catch (_) {}
+        },
+        onError: (_) {},
+      );
+    } catch (e) {
+      debugPrint('WebSocket Error: $e');
+    }
+  }
+
+  void _onMapCreated(MapLibreMapController controller) {
     _mapController = controller;
-    // Add custom marker icon (using a simple circle or loading an asset)
-    // For MVP transparency, we'll try to load a known asset or just use a default circle if possible.
-    // Since we don't have a guaranteed bus asset loaded in the style, we'll try to add a CircleLayer instead for simplicity and reliability?
-    // actually, addImage is better if we have an asset. Let's assume we don't and just use a Symbol with a fallback or Circle.
-    // Changing to CircleLayer for maximum reliability without assets.
   }
 
   void _updateBusLocation(LatLng position) {
     if (_mapController != null) {
       _mapController!.clearCircles();
-      _mapController!.addCircle(CircleOptions(
-        geometry: position,
-        circleColor: "#FF0000",
-        circleRadius: 10,
-        circleStrokeWidth: 2,
-        circleStrokeColor: "#FFFFFF",
-      ));
+      _mapController!.addCircle(
+        CircleOptions(
+          geometry: position,
+          circleColor: '#FF0000',
+          circleRadius: 10,
+          circleStrokeWidth: 2,
+          circleStrokeColor: '#FFFFFF',
+        ),
+      );
       _mapController!.animateCamera(CameraUpdate.newLatLng(position));
     }
   }
 
   @override
   void dispose() {
-    _pulseController.dispose();
     _channel?.sink.close();
     super.dispose();
   }
 
+  String _formatTime(dynamic rawIso, {String fallback = 'Scheduled'}) {
+    if (rawIso == null) return fallback;
+    final DateTime? parsed = DateTime.tryParse(rawIso.toString());
+    if (parsed == null) return rawIso.toString();
+    final DateTime local = parsed.toLocal();
+    final int hour12 =
+        local.hour > 12 ? local.hour - 12 : (local.hour == 0 ? 12 : local.hour);
+    final String amPm = local.hour >= 12 ? 'PM' : 'AM';
+    final String min = local.minute.toString().padLeft(2, '0');
+    return '$hour12:$min $amPm';
+  }
+
+  List<Map<String, String>> _buildTimelineStops() {
+    final dynamic rawTimeline = _tripDetails['timeline'];
+    final List<Map<String, String>> stops = <Map<String, String>>[];
+
+    if (rawTimeline is List && rawTimeline.isNotEmpty) {
+      for (int i = 0; i < rawTimeline.length; i++) {
+        final dynamic item = rawTimeline[i];
+        if (item is Map) {
+          final String name =
+              (item['name'] ?? item['stop'] ?? 'Stop ${i + 1}').toString();
+          final String time = (item['time'] ??
+                  item['eta'] ??
+                  (i == 0
+                      ? _formatTime(_tripDetails['departure_time'])
+                      : 'Stop ${i + 1}'))
+              .toString();
+          stops.add(<String, String>{'name': name, 'time': time});
+        } else {
+          stops.add(<String, String>{
+            'name': item.toString(),
+            'time': i == 0
+                ? _formatTime(_tripDetails['departure_time'])
+                : 'En route',
+          });
+        }
+      }
+    }
+
+    if (stops.isEmpty) {
+      final String origin = (_tripDetails['origin'] ?? 'Kampala').toString();
+      final String destination =
+          (_tripDetails['destination'] ?? 'Gulu').toString();
+      stops.addAll(<Map<String, String>>[
+        <String, String>{
+          'name': '$origin Main Terminal',
+          'time': _formatTime(_tripDetails['departure_time']),
+        },
+        <String, String>{
+          'name': '$destination Central Terminal',
+          'time': _formatTime(
+            _tripDetails['arrival_time'],
+            fallback: 'Arrival',
+          ),
+        },
+      ]);
+    }
+    return stops;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final int availableSeats = int.tryParse(
+          (_tripDetails['available_seats'] ?? _tripDetails['seats'] ?? '0')
+              .toString(),
+        ) ??
+        0;
+    final String formattedPrice = AppTokens.formatUgx(_tripDetails['price']);
+    final String depTime = _formatTime(_tripDetails['departure_time']);
+    final String arrTime = _formatTime(
+      _tripDetails['arrival_time'],
+      fallback: 'Scheduled',
+    );
+    final List<Map<String, String>> stops = _buildTimelineStops();
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // 1. Map Placeholder (Static Image - Google Style)
-          // 1. Live Tracking Map Preview (MapLibre Entry)
-          // 1. Embedded Map (MapLibre)
+          // 1. Embedded MapLibre Preview
           SizedBox(
-            height: MediaQuery.of(context).size.height * 0.6,
+            height: MediaQuery.of(context).size.height * 0.58,
             width: double.infinity,
-            child: MaplibreMap(
+            child: MapLibreMap(
               initialCameraPosition: CameraPosition(target: _center, zoom: 12),
               onMapCreated: _onMapCreated,
-              // Using Cartesian standard style (reliable for vector tiles)
-              // Or use a raster style if vector fails on device
-              styleString: "https://demotiles.maplibre.org/style.json",
-              myLocationEnabled: false, // Don't use user location for now
+              styleString: 'https://demotiles.maplibre.org/style.json',
+              myLocationEnabled: false,
               attributionButtonPosition: AttributionButtonPosition.topRight,
             ),
           ),
 
-          // 2. Top Buttons (Back, Share, SOS)
+          // 2. Top Navigation & Live Tracking Bar
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -131,20 +211,47 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> with SingleTickerPr
                   CircleAvatar(
                     backgroundColor: Colors.white,
                     child: IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black),
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.black,
+                      ),
                       onPressed: () => context.pop(),
                     ),
                   ),
                   Row(
                     children: [
-                      CircleAvatar(
-                        backgroundColor: Colors.orange,
-                        child: const Icon(Icons.share, color: Colors.white, size: 20),
-                      ),
-                      const SizedBox(width: 12),
-                      CircleAvatar(
-                        backgroundColor: Colors.red,
-                        child: Text("SOS", style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                      GestureDetector(
+                        onTap: () =>
+                            context.push('/tracking', extra: _tripDetails),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.8),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white24),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.my_location_rounded,
+                                color: Colors.greenAccent,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Full Map',
+                                style: GoogleFonts.outfit(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -153,144 +260,190 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> with SingleTickerPr
             ),
           ),
 
-          // 3. Draggable Scrollable Sheet (Details - Dark Theme)
+          // 3. Draggable Details Sheet
           DraggableScrollableSheet(
-            initialChildSize: 0.40, // Start lower so map is visible
-            minChildSize: 0.20,     // Can be dragged down to see almost full map
-            maxChildSize: 0.60,     // Max height is ~60% of screen (halfway + bit more)
+            initialChildSize: 0.46,
+            minChildSize: 0.25,
+            maxChildSize: 0.72,
             builder: (context, scrollController) {
               return Container(
                 decoration: BoxDecoration(
-                  color: Colors.black, // Dark Wallet Style
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  color: Colors.black,
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(30)),
+                  border:
+                      Border.all(color: Colors.white.withValues(alpha: 0.1)),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20, offset: const Offset(0, -5)),
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      blurRadius: 20,
+                      offset: const Offset(0, -5),
+                    ),
                   ],
                 ),
-                child: Stack(
+                child: ListView(
+                  controller: scrollController,
+                  padding: EdgeInsets.zero,
                   children: [
-                    // Content Column
-                    ListView(
-                      controller: scrollController,
-                      padding: EdgeInsets.zero,
-                      children: [
-                        // Handle
-                        Center(
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(vertical: 12),
-                            width: 40,
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: Colors.white24,
-                              borderRadius: BorderRadius.circular(2),
+                    Center(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(vertical: 12),
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 6, 24, 0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildTimeInfo('Departure', depTime),
+                          Expanded(
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 12),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.circle,
+                                    size: 8,
+                                    color: Colors.white54,
+                                  ),
+                                  const Expanded(
+                                    child: Divider(color: Colors.white24),
+                                  ),
+                                  Text(
+                                    (_tripDetails['bus_plate'] ?? 'Twende')
+                                        .toString(),
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 12,
+                                      color: Colors.white70,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const Expanded(
+                                    child: Divider(color: Colors.white24),
+                                  ),
+                                  const Icon(
+                                    Icons.location_on,
+                                    size: 10,
+                                    color: Colors.redAccent,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-
-                        // Header Info
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(24, 10, 24, 0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _buildTimeInfo("Departure", widget.bus['time'] ?? '07:00 AM'),
-                              // Dotted Line
-                              Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.circle, size: 8, color: Colors.white54),
-                                      const Expanded(child: Divider(color: Colors.white24)),
-                                      Text("30 min", style: GoogleFonts.outfit(fontSize: 12, color: Colors.white54)),
-                                      const Expanded(child: Divider(color: Colors.white24)),
-                                      const Icon(Icons.location_on, size: 8, color: Colors.redAccent),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              _buildTimeInfo("Arrival", "10:35 AM"), 
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 12),
-                        
-                        // Seats & Price Row
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              // Pulsing "Book a Seat" Button
-                              GestureDetector(
-                                onTap: () async {
-                                  // Navigate to Seat Selection
-                                  context.push('/seat_selection', extra: widget.bus);
-                                  
-
-                                },
-                                child: ScaleTransition(
-                                  scale: _pulseAnimation,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // Reduced Padding
-                                    decoration: BoxDecoration(
-                                      color: Colors.redAccent.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.event_seat, color: Colors.redAccent, size: 16),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          "Select Seats ($_currentAvailableSeats)", // Updated Text
-                                          style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              
-                              const SizedBox(width: 16), // Explicit spacing just in case
-                              
-                              Flexible(
-                                child: Text(
-                                  "Price: ${widget.bus['price']}",
-                                  style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                                  textAlign: TextAlign.end,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const Divider(height: 30, color: Colors.white12),
-
-                        // Timeline Content (4 Stops + Start/End)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildTimelineItem("Kampala Bus Terminal", "07:00 AM", isFirst: true),
-                              _buildTimelineItem("Mukono Taxi Park", "07:45 AM"),
-                              _buildTimelineItem("Jinja Bridge Stop", "08:30 AM"),
-                              _buildTimelineItem("Iganga Main Stage", "09:15 AM", isCurrent: true),
-                              _buildTimelineItem("Bugiri Town", "09:50 AM"),
-                              _buildTimelineItem("Busia Border Post", "10:35 AM", isLast: true),
-                            ],
-                          ),
-                        ),
-                        
-                        const SizedBox(height: 100), // Space for bottom safe area
-                      ],
+                          _buildTimeInfo('Arrival', arrTime),
+                        ],
+                      ),
                     ),
+                    const SizedBox(height: 16),
 
+                    // Select Seats CTA & Price Row (Static, no infinite pulse)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          GestureDetector(
+                            onTap: () async {
+                              await context.push(
+                                '/seat_selection',
+                                extra: _tripDetails,
+                              );
+                              if (mounted) {
+                                _loadLiveTripDetails();
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTokens.selected,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.event_seat,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Select Seats ($availableSeats left)',
+                                    style: GoogleFonts.outfit(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      fontFeatures: AppTokens.tabularFigures,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Flexible(
+                            child: Text(
+                              formattedPrice,
+                              style: GoogleFonts.outfit(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                fontFeatures: AppTokens.tabularFigures,
+                              ),
+                              textAlign: TextAlign.end,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 30, color: Colors.white12),
 
+                    if (_isLoading)
+                      const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: AppTokens.primary,
+                          ),
+                        ),
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Route Stops Timeline',
+                              style: GoogleFonts.outfit(
+                                color: Colors.white70,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            for (int i = 0; i < stops.length; i++)
+                              _buildTimelineItem(
+                                stops[i]['name'] ?? 'Stop ${i + 1}',
+                                stops[i]['time'] ?? '',
+                                isFirst: i == 0,
+                                isLast: i == stops.length - 1,
+                                isCurrent: i == 0,
+                              ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 80),
                   ],
                 ),
               );
@@ -305,46 +458,70 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> with SingleTickerPr
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: GoogleFonts.outfit(fontSize: 12, color: Colors.white54)),
-        Text(time, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+        Text(
+          label,
+          style: GoogleFonts.outfit(fontSize: 12, color: Colors.white54),
+        ),
+        Text(
+          time,
+          style: GoogleFonts.outfit(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontFeatures: AppTokens.tabularFigures,
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildTimelineItem(String station, String time, {bool isFirst = false, bool isLast = false, bool isCurrent = false}) {
+  Widget _buildTimelineItem(
+    String station,
+    String time, {
+    bool isFirst = false,
+    bool isLast = false,
+    bool isCurrent = false,
+  }) {
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Timeline Line & Dots
           SizedBox(
             width: 30,
             child: Column(
               children: [
-                if (!isFirst) Expanded(child: Container(width: 2, color: const Color(0xFF7B1FA2))), // Deep Rich Purple Line
+                if (!isFirst)
+                  Expanded(
+                    child: Container(width: 2, color: AppTokens.primary),
+                  ),
                 Icon(
-                  isFirst || isLast ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                  color: isCurrent ? Colors.white : const Color(0xFF7B1FA2), // Purple/White Dots
+                  isFirst || isLast
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  color: isCurrent ? Colors.white : AppTokens.primary,
                   size: 16,
                 ),
-                if (!isLast) Expanded(child: Container(width: 2, color: const Color(0xFF7B1FA2))), // Deep Rich Purple Line
+                if (!isLast)
+                  Expanded(
+                    child: Container(width: 2, color: AppTokens.primary),
+                  ),
               ],
             ),
           ),
           const SizedBox(width: 12),
-          // Content
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 24), // Spacing between items
+              padding: const EdgeInsets.only(bottom: 22),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded( // To fix overflow
+                  Expanded(
                     child: Text(
                       station,
                       style: GoogleFonts.outfit(
                         color: isCurrent ? Colors.white : Colors.white70,
-                        fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                        fontWeight:
+                            isCurrent ? FontWeight.bold : FontWeight.normal,
                         fontSize: 14,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -355,8 +532,10 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> with SingleTickerPr
                     time,
                     style: GoogleFonts.outfit(
                       color: isCurrent ? Colors.white : Colors.white54,
-                      fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                      fontWeight:
+                          isCurrent ? FontWeight.bold : FontWeight.normal,
                       fontSize: 12,
+                      fontFeatures: AppTokens.tabularFigures,
                     ),
                   ),
                 ],
